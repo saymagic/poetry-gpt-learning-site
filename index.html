@@ -1,0 +1,2239 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>从 0 到 1 预训练诗词模型</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f6f72'/%3E%3Cpath d='M16 43c12-3 22-11 31-24M20 21h19M25 30h14' stroke='white' stroke-width='5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="progress" id="progress"></div>
+  <header class="site-header">
+    <a class="brand" href="#top">Poetry GPT Lab</a>
+    <nav class="top-nav" aria-label="顶部导航">
+      <a href="#overview">总览</a>
+      <a href="#chapters">完整教程</a>
+      <a href="#generate">生成</a>
+      <a href="#scale">扩展</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <img src="assets/hero-poetry-gpt.png" alt="古典诗词与 Transformer 模型融合的教学插图">
+      <div class="hero-shade"></div>
+      <div class="hero-content">
+        <p class="eyebrow">Verified local run · Chinese classical poetry pretraining</p>
+        <h1>从 0 到 1 预训练一个诗词生成模型</h1>
+        <p>从真实诗词语料开始，走过数据清洗、tokenizer、GPT 训练、验证、生成与扩展实验。每一步都有命令、原理、产物和检查点。</p>
+        <div class="hero-actions">
+          <a href="#chapters">浏览完整教程</a>
+          <a href="#metrics">查看训练结果</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="quick-start">
+      <div>
+        <span class="section-kicker">Learning Path</span>
+        <h2>按这个顺序学，脑子会轻很多</h2>
+      </div>
+      <div class="journey">
+        <span>环境</span><span>数据</span><span>Tokenizer</span><span>HF 训练</span><span>PyTorch 原理</span><span>验证</span><span>生成</span><span>扩展</span>
+      </div>
+    </section>
+
+    
+<section id="overview" class="band overview-band">
+  <div class="section-kicker">Project View</div>
+  <h2>从诗词语料到可生成模型</h2>
+  <p class="lead">这套站点把 Markdown 教程、真实训练报告、章节 Agent 的提炼和两张生成图整合在一起。先看可视化总览，再进入每章完整正文。</p>
+  <div class="pipeline-visual">
+    <img src="assets/pipeline-poetry-gpt.png" alt="诗词预训练流程概念图">
+    <div class="flow-strip" aria-label="训练流程">
+      <span>JSONL</span><span>清洗</span><span>BPE</span><span>Token Blocks</span><span>GPT</span><span>Checkpoint</span><span>生成</span>
+    </div>
+  </div>
+</section>
+
+<section id="metrics" class="band">
+  <div class="section-kicker">Verified Run</div>
+  <h2>这次真实训练已经跑通</h2>
+  <div class="metric-grid">
+    <div class="metric"><span>参数量</span><strong>6.30M</strong><small>tiny GPT</small></div>
+    <div class="metric"><span>词表</span><strong>12000</strong><small>byte-level BPE</small></div>
+    <div class="metric"><span>训练步数</span><strong>5000</strong><small>max steps</small></div>
+    <div class="metric"><span>验证结果</span><strong>PASS</strong><small>加载与生成通过</small></div>
+  </div>
+  <div class="viz-grid two">
+    <figure class="figure-panel">
+      <svg viewBox="0 0 720 300" role="img" aria-label="训练 loss 和验证 loss 下降图">
+        <rect x="0" y="0" width="720" height="300" rx="8" fill="#fbfbf8"/>
+        <line x1="74" y1="238" x2="660" y2="238" stroke="#89938d" stroke-width="1"/>
+        <line x1="74" y1="42" x2="74" y2="238" stroke="#89938d" stroke-width="1"/>
+        <polyline points="82,62 210,116 336,151 480,181 650,198" fill="none" stroke="#b8422f" stroke-width="5" stroke-linecap="round"/>
+        <polyline points="82,110 210,142 336,166 480,190 650,204" fill="none" stroke="#1f6f72" stroke-width="5" stroke-linecap="round"/>
+        <g fill="#1f2d2e" font-family="ui-monospace, Menlo, monospace" font-size="13">
+          <text x="74" y="264">100</text><text x="195" y="264">1000</text><text x="322" y="264">2500</text><text x="468" y="264">4000</text><text x="628" y="264">5000</text>
+          <text x="92" y="58">train 7.9845</text><text x="520" y="190">5.4444</text>
+          <text x="92" y="108">eval 6.3748</text><text x="520" y="220">5.3364</text>
+        </g>
+        <circle cx="650" cy="198" r="7" fill="#b8422f"/><circle cx="650" cy="204" r="7" fill="#1f6f72"/>
+      </svg>
+      <figcaption><span>FIG 1</span>训练 loss 与验证 loss 都下降，说明链路健康。</figcaption>
+    </figure>
+    <figure class="figure-panel">
+      <svg viewBox="0 0 720 300" role="img" aria-label="checkpoint 时间线">
+        <rect x="0" y="0" width="720" height="300" rx="8" fill="#fbfbf8"/>
+        <line x1="78" y1="150" x2="640" y2="150" stroke="#d5d8d2" stroke-width="10" stroke-linecap="round"/>
+        <g font-family="ui-monospace, Menlo, monospace" text-anchor="middle">
+          <g><circle cx="104" cy="150" r="18" fill="#1f6f72"/><text x="104" y="214" font-size="14">env</text></g>
+          <g><circle cx="214" cy="150" r="18" fill="#1f6f72"/><text x="214" y="214" font-size="14">tokenizer</text></g>
+          <g><circle cx="324" cy="150" r="18" fill="#b8422f"/><text x="324" y="214" font-size="14">3000</text></g>
+          <g><circle cx="434" cy="150" r="18" fill="#b8422f"/><text x="434" y="214" font-size="14">4000</text></g>
+          <g><circle cx="544" cy="150" r="18" fill="#b8422f"/><text x="544" y="214" font-size="14">5000</text></g>
+          <g><circle cx="640" cy="150" r="18" fill="#1f2d2e"/><text x="640" y="214" font-size="14">generate</text></g>
+        </g>
+      </svg>
+      <figcaption><span>FIG 2</span>最终保留 checkpoint-3000、4000、5000，并导出 final model。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="transformer" class="band">
+  <div class="section-kicker">Inside GPT</div>
+  <h2>手写 PyTorch GPT 的内部结构</h2>
+  <div class="viz-grid two">
+    <figure class="figure-panel">
+      <svg viewBox="0 0 720 360" role="img" aria-label="Transformer block 结构">
+        <rect x="0" y="0" width="720" height="360" rx="8" fill="#fbfbf8"/>
+        <g font-family="ui-sans-serif, system-ui" font-size="18" text-anchor="middle">
+          <rect x="70" y="142" width="116" height="64" rx="8" fill="#e8eee9" stroke="#78918e"/><text x="128" y="180">Token IDs</text>
+          <rect x="230" y="64" width="130" height="58" rx="8" fill="#eaf2f2" stroke="#1f6f72"/><text x="295" y="99">Embedding</text>
+          <rect x="230" y="220" width="130" height="58" rx="8" fill="#f6e9df" stroke="#b8422f"/><text x="295" y="255">Position</text>
+          <rect x="408" y="52" width="190" height="250" rx="8" fill="#fffdf7" stroke="#89938d"/>
+          <text x="503" y="86" font-weight="700">Transformer Block</text>
+          <rect x="442" y="112" width="122" height="42" rx="8" fill="#e8eee9"/><text x="503" y="139">LayerNorm</text>
+          <rect x="442" y="166" width="122" height="42" rx="8" fill="#eaf2f2"/><text x="503" y="193">Attention</text>
+          <rect x="442" y="220" width="122" height="42" rx="8" fill="#f6e9df"/><text x="503" y="247">MLP</text>
+          <rect x="624" y="142" width="72" height="64" rx="8" fill="#1f2d2e"/><text x="660" y="180" fill="#fff">Logits</text>
+        </g>
+        <g stroke="#56615e" stroke-width="3" fill="none" stroke-linecap="round">
+          <path d="M186 174 C205 174 210 93 230 93"/><path d="M186 174 C205 174 210 249 230 249"/>
+          <path d="M360 93 C386 93 386 177 408 177"/><path d="M360 249 C386 249 386 177 408 177"/>
+          <path d="M598 177 L624 177"/>
+        </g>
+      </svg>
+      <figcaption><span>FIG 3</span>token embedding 与 position embedding 叠加后进入 Transformer block。</figcaption>
+    </figure>
+    <figure class="figure-panel">
+      <svg viewBox="0 0 720 360" role="img" aria-label="causal mask 下三角矩阵">
+        <rect x="0" y="0" width="720" height="360" rx="8" fill="#fbfbf8"/>
+        <g transform="translate(144,48)">
+          <g font-family="ui-monospace, Menlo, monospace" font-size="13">
+            <text x="0" y="-14">Causal Mask: 只能看过去和当前</text>
+          </g>
+          <rect x="0" y="0" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="38" y="0" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="76" y="0" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="114" y="0" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="152" y="0" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="190" y="0" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="228" y="0" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="0" y="38" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="38" y="38" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="76" y="38" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="114" y="38" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="152" y="38" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="190" y="38" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="228" y="38" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="0" y="76" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="38" y="76" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="76" y="76" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="114" y="76" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="152" y="76" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="190" y="76" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="228" y="76" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="0" y="114" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="38" y="114" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="76" y="114" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="114" y="114" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="152" y="114" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="190" y="114" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="228" y="114" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="0" y="152" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="38" y="152" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="76" y="152" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="114" y="152" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="152" y="152" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="190" y="152" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="228" y="152" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="0" y="190" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="38" y="190" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="76" y="190" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="114" y="190" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="152" y="190" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="190" y="190" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="228" y="190" width="34" height="34" rx="5" fill="#e7e4dc" opacity="0.55"/><rect x="0" y="228" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="38" y="228" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="76" y="228" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="114" y="228" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="152" y="228" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="190" y="228" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/><rect x="228" y="228" width="34" height="34" rx="5" fill="#1f6f72" opacity="0.92"/>
+          <g font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#1f2d2e">
+            <text x="292" y="38">future 被遮住</text>
+            <text x="292" y="204">history 可见</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption><span>FIG 4</span>causal mask 防止模型在训练时偷看未来答案。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="verify" class="band">
+  <div class="section-kicker">Reliable Loop</div>
+  <h2>验证不是附属品，而是训练链路的一部分</h2>
+  <div class="check-grid">
+    <div class="check"><strong>环境</strong><span>Python 3.11、依赖、MPS/CPU、磁盘、数据文件。</span></div>
+    <div class="check"><strong>Tokenizer</strong><span>encode/decode 中文样本后仍然可读。</span></div>
+    <div class="check"><strong>Forward</strong><span>loss 是有限数值，不是 nan 或 inf。</span></div>
+    <div class="check"><strong>Checkpoint</strong><span>能保存，也能重新加载。</span></div>
+    <div class="check"><strong>生成</strong><span>文本非空、包含中文、无明显乱码。</span></div>
+    <div class="check"><strong>报告</strong><span>记录命令、loss、样本和模型路径。</span></div>
+  </div>
+  <div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/check_training_environment.py
+python -m py_compile scripts/*.py
+python scripts/verify_pretraining_pipeline.py --backend both --max-steps 120</code></pre></div>
+</section>
+
+<section id="generate" class="band">
+  <div class="section-kicker">Generation</div>
+  <h2>从 prompt 生成第一组诗词样本</h2>
+  <div class="sample-panel">
+    <blockquote>春风，醉饮东风。<br>待酒满来多旧里，争思两重倾。<br>愁时对、犹成清绝。<br>花面点红绡。</blockquote>
+    <div class="param-list">
+      <span><b>temperature</b> 控制随机性</span>
+      <span><b>top-p</b> 保留累计概率候选</span>
+      <span><b>top-k</b> 限制最高概率候选数</span>
+      <span><b>repetition penalty</b> 减少重复</span>
+    </div>
+  </div>
+  <div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/generate_poetry.py \
+  --model-dir artifacts/poetry-gpt-tiny-body \
+  --prompt &quot;春风&quot; \
+  --max-new-tokens 120 \
+  --temperature 0.88 \
+  --top-p 0.92 \
+  --top-k 50 \
+  --repetition-penalty 1.08 \
+  --num-return-sequences 3</code></pre></div>
+</section>
+
+<section id="scale" class="band">
+  <div class="section-kicker">Next Experiments</div>
+  <h2>从 tiny baseline 走向系统实验</h2>
+  <div class="roadmap">
+    <span>更干净的数据</span>
+    <span>更合适的 tokenizer</span>
+    <span>更长训练</span>
+    <span>更大模型</span>
+    <span>更系统评估</span>
+    <span>条件生成或微调</span>
+  </div>
+  <div class="experiment-grid">
+    <div><strong>tiny 20k</strong><p>判断 longer training 是否明显提升生成样本。</p></div>
+    <div><strong>small 5k</strong><p>判断更大模型是否更快学到结构。</p></div>
+    <div><strong>with-meta 10k</strong><p>验证题目、作者、朝代条件生成是否有用。</p></div>
+  </div>
+</section>
+
+
+    <section id="chapters" class="chapters-layout">
+      <aside class="side-nav">
+        <label for="chapterSearch">搜索教程</label>
+        <input id="chapterSearch" type="search" placeholder="loss / tokenizer / top-p">
+        <nav aria-label="章节导航">
+          <a href="#overview">总览</a>
+<a href="#metrics">真实训练</a>
+<a href="#transformer">模型内部</a>
+<a href="#verify">验证</a>
+<a href="#generate">生成</a>
+<a href="#scale">扩展</a>
+<a href="#chapter-start">学习入口</a>
+<a href="#chapter-00-project-map">项目地图</a>
+<a href="#chapter-01-environment-and-data">环境与数据</a>
+<a href="#chapter-02-tokenizer">训练 Tokenizer</a>
+<a href="#chapter-03-hf-pretraining">HF 工程线</a>
+<a href="#chapter-04-pytorch-gpt-from-scratch">手写 PyTorch GPT</a>
+<a href="#chapter-05-verification-and-testing">验证与测试</a>
+<a href="#chapter-06-generation-and-evaluation">生成与评估</a>
+<a href="#chapter-07-next-steps-and-scale">扩展路线</a>
+<a href="#chapter-08-glossary">术语表</a>
+<a href="#chapter-09-public-deployment">公网部署</a>
+        </nav>
+      </aside>
+      <div class="chapters">
+        
+<article class="chapter" id="chapter-start" data-title="学习入口 从 0 到 1 预训练诗词模型：学习入口">
+  <div class="chapter-head">
+    <span>README.md</span>
+    <h2>从 0 到 1 预训练诗词模型：学习入口</h2>
+    <p>从真实数据、真实脚本和真实训练结果开始，建立完整学习路线。</p>
+  </div>
+  <div class="chapter-body">
+    <p>这是一套围绕本项目真实数据、真实脚本、真实训练结果整理的系列教程。目标不是把你带到“复制一串命令就结束”，而是让你逐步知道：</p>
+<ul>
+<li>原始诗词数据如何变成可训练语料。</li>
+<li>tokenizer 为什么必须先训练。</li>
+<li>GPT 预训练到底在优化什么。</li>
+<li>Hugging Face 版本如何稳定跑完整工程链路。</li>
+<li>手写 PyTorch 版本如何帮助你理解 Transformer 内部。</li>
+<li>怎样判断一次训练是健康的。</li>
+<li>最终模型能生成什么，不能生成什么。</li>
+</ul>
+<p>本系列默认你在项目根目录执行命令：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>cd /path/to/your/project</code></pre></div>
+<h3>推荐学习顺序</h3>
+<p>如果你想用网页方式浏览，打开静态站点：</p>
+<p><a href="#top">site/index.html</a></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>顺序</th>
+<th>文档</th>
+<th>你会学到什么</th>
+</tr></thead><tbody>
+<tr>
+<td>0</td>
+<td><a href="#chapter-00-project-map">00_project_map.md</a></td>
+<td>项目结构、整体训练链路、每个产物放在哪里。</td>
+</tr>
+<tr>
+<td>1</td>
+<td><a href="#chapter-01-environment-and-data">01_environment_and_data.md</a></td>
+<td>Python 环境、依赖检查、数据文件、清洗结果。</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="#chapter-02-tokenizer">02_tokenizer.md</a></td>
+<td>token、BPE、中文诗词 tokenizer 的训练与验证。</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="#chapter-03-hf-pretraining">03_hf_pretraining.md</a></td>
+<td>使用 Hugging Face 从随机初始化训练一个完整 GPT。</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="#chapter-04-pytorch-gpt-from-scratch">04_pytorch_gpt_from_scratch.md</a></td>
+<td>手写 PyTorch GPT：embedding、attention、MLP、loss、训练循环。</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="#chapter-05-verification-and-testing">05_verification_and_testing.md</a></td>
+<td>如何验证环境、数据、tokenizer、训练、保存加载、生成。</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="#chapter-06-generation-and-evaluation">06_generation_and_evaluation.md</a></td>
+<td>用模型生成诗词、理解采样参数、评估生成质量。</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="#chapter-07-next-steps-and-scale">07_next_steps_and_scale.md</a></td>
+<td>从 tiny 实验走向更长训练、更大模型和更系统评估。</td>
+</tr>
+<tr>
+<td>8</td>
+<td><a href="#chapter-08-glossary">08_glossary.md</a></td>
+<td>术语表：把常见概念放在一处查。</td>
+</tr>
+<tr>
+<td>9</td>
+<td><a href="#chapter-09-public-deployment">09_public_deployment.md</a></td>
+<td>把静态学习站点部署到公网，供其它设备访问。</td>
+</tr>
+</tbody></table></div>
+<h3>最短可运行路径</h3>
+<p>如果你只想先确认整套链路能跑：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>uv venv --python &quot;$HOME/.local/bin/python3.11&quot; .venv
+source .venv/bin/activate
+uv pip install --python .venv/bin/python -r requirements-training.txt
+
+python scripts/check_training_environment.py
+python scripts/verify_pretraining_pipeline.py --backend both --max-steps 120</code></pre></div>
+<p>如果 tokenizer 还没有训练：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tokenizer.py \
+  --input data/processed/pretrain_shi_ci_body.txt \
+  --output-dir artifacts/poetry-bpe-tokenizer \
+  --vocab-size 12000 \
+  --min-frequency 2</code></pre></div>
+<p>训练一个 tiny 正文模型：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-tiny-body \
+  --model-size tiny \
+  --block-size 256 \
+  --max-steps 5000 \
+  --per-device-train-batch-size 8 \
+  --per-device-eval-batch-size 8 \
+  --gradient-accumulation-steps 4 \
+  --learning-rate 5e-4 \
+  --warmup-ratio 0.03 \
+  --weight-decay 0.1 \
+  --logging-steps 100 \
+  --eval-steps 500 \
+  --save-steps 1000 \
+  --save-total-limit 3</code></pre></div>
+<p>生成：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/generate_poetry.py \
+  --model-dir artifacts/poetry-gpt-tiny-body \
+  --prompt &quot;春风&quot; \
+  --max-new-tokens 120 \
+  --temperature 0.88 \
+  --top-p 0.92 \
+  --num-return-sequences 3</code></pre></div>
+<h3>本项目已经跑通的真实结果</h3>
+<p>这次完整训练已经完成，产物在：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/</code></pre></div>
+<p>关键指标：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>项目</th>
+<th>结果</th>
+</tr></thead><tbody>
+<tr>
+<td>模型</td>
+<td>从零初始化的 <code>GPT2LMHeadModel</code></td>
+</tr>
+<tr>
+<td>参数量</td>
+<td>约 6.30M</td>
+</tr>
+<tr>
+<td>词表大小</td>
+<td>12000</td>
+</tr>
+<tr>
+<td>训练步数</td>
+<td>5000</td>
+</tr>
+<tr>
+<td>训练 block</td>
+<td>84007</td>
+</tr>
+<tr>
+<td>验证 block</td>
+<td>863</td>
+</tr>
+<tr>
+<td>首个训练 loss</td>
+<td>7.9845</td>
+</tr>
+<tr>
+<td>最终训练 loss</td>
+<td>5.4444</td>
+</tr>
+<tr>
+<td>首个验证 loss</td>
+<td>6.3748</td>
+</tr>
+<tr>
+<td>最终验证 loss</td>
+<td>5.3364</td>
+</tr>
+<tr>
+<td>最终模型加载</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>CLI 生成</td>
+<td>PASS</td>
+</tr>
+<tr>
+<td>生成样本</td>
+<td>18 条，全部非空且包含中文</td>
+</tr>
+</tbody></table></div>
+<p>报告和样本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/training_run_report.md
+artifacts/poetry-gpt-tiny-body/generated_samples.txt
+artifacts/poetry-gpt-tiny-body/generated_samples.jsonl</code></pre></div>
+<p>样例：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春风，醉饮东风。
+待酒满来多旧里，争思两重倾。
+愁时对、犹成清绝。
+花面点红绡。
+问长恨。
+谁能与、似说花头。</code></pre></div>
+<p>这说明模型已经是完整可加载、可生成的模型。不过它仍然是 tiny 级别的短训练模型，适合学习预训练链路和做实验，不适合直接当成高质量诗词创作模型或历史知识模型。</p>
+<h3>学习时的判断标准</h3>
+<p>每一章都请你关注四件事：</p>
+<ul>
+<li>输入是什么：文件、参数、提示词。</li>
+<li>过程是什么：tokenize、pack block、forward、loss、backward、save。</li>
+<li>输出是什么：tokenizer、checkpoint、日志、生成样本。</li>
+<li>如何验证：环境检查、loss 是否有限、checkpoint 能否加载、生成是否非空。</li>
+</ul>
+<p>你真正掌握这套流程的标志，不是记住命令，而是当某一步失败时能判断它失败在数据、tokenizer、模型、训练参数还是生成参数。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-00-project-map" data-title="项目地图 00 项目地图与整体链路">
+  <div class="chapter-head">
+    <span>00_project_map.md</span>
+    <h2>00 项目地图与整体链路</h2>
+    <p>看懂项目结构、数据流、训练链路和关键产物。</p>
+  </div>
+  <div class="chapter-body">
+    <p>这一章先建立全局视角。你需要知道项目里哪些文件是数据，哪些是脚本，哪些是训练产物，以及一次从零预训练会经过哪些阶段。</p>
+<h3>项目结构</h3>
+<p>核心目录如下：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>.
+├── README.md
+├── requirements-training.txt
+├── docs/
+│   └── pretraining_from_scratch.md
+├── learning/
+│   └── 本系列教程
+├── scripts/
+│   ├── build_poetry_corpus.py
+│   ├── train_tokenizer.py
+│   ├── train_tiny_gpt.py
+│   ├── generate_poetry.py
+│   ├── train_pytorch_gpt.py
+│   ├── generate_pytorch_gpt.py
+│   ├── check_training_environment.py
+│   └── verify_pretraining_pipeline.py
+├── data/
+│   ├── raw/
+│   └── processed/
+└── artifacts/
+    ├── poetry-bpe-tokenizer/
+    ├── poetry-gpt-tiny-body/
+    └── verification/</code></pre></div>
+<p>你可以把它理解成四层：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>层</th>
+<th>目录</th>
+<th>作用</th>
+</tr></thead><tbody>
+<tr>
+<td>原料层</td>
+<td><code>data/raw/</code></td>
+<td>从上游仓库下载的原始诗词 JSON。</td>
+</tr>
+<tr>
+<td>数据层</td>
+<td><code>data/processed/</code></td>
+<td>清洗、去重、切分后的训练语料。</td>
+</tr>
+<tr>
+<td>脚本层</td>
+<td><code>scripts/</code></td>
+<td>构建数据、训练 tokenizer、训练模型、生成、验证。</td>
+</tr>
+<tr>
+<td>产物层</td>
+<td><code>artifacts/</code></td>
+<td>tokenizer、checkpoint、最终模型、报告、样本。</td>
+</tr>
+</tbody></table></div>
+<h3>一次完整预训练发生了什么</h3>
+<div class="code-block" data-lang="mermaid"><div class="code-head"><span>mermaid</span><button type="button" class="copy-btn">复制</button></div><pre><code>flowchart TD
+  A[&quot;原始诗词 JSON&quot;] --&gt; B[&quot;清洗与去重&quot;]
+  B --&gt; C[&quot;JSONL / TXT 训练语料&quot;]
+  C --&gt; D[&quot;训练 byte-level BPE tokenizer&quot;]
+  D --&gt; E[&quot;把文本转成 token id&quot;]
+  E --&gt; F[&quot;拼接成固定长度 block&quot;]
+  F --&gt; G[&quot;GPT 前向计算 logits&quot;]
+  G --&gt; H[&quot;下一个 token 的 cross entropy loss&quot;]
+  H --&gt; I[&quot;反向传播与 AdamW 更新参数&quot;]
+  I --&gt; J[&quot;保存 checkpoint / final model&quot;]
+  J --&gt; K[&quot;加载模型生成诗词&quot;]
+  K --&gt; L[&quot;评估样本与记录报告&quot;]</code></pre></div>
+<p>这条链路里每一步都可以被验证。不要把“能训练”只理解为命令跑完；真正可靠的训练应该满足：</p>
+<ul>
+<li>数据文件存在且可解析。</li>
+<li>tokenizer encode/decode 中文样本后仍可读。</li>
+<li>模型 forward 得到有限 loss，不是 <code>nan</code> 或 <code>inf</code>。</li>
+<li>短训练能保存 checkpoint。</li>
+<li>checkpoint 能重新加载。</li>
+<li>生成文本非空，并包含中文。</li>
+<li>loss 有记录，整体趋势合理。</li>
+</ul>
+<h3>两条教程线</h3>
+<p>本项目有两套训练路线。</p>
+<h4>Hugging Face 工程线</h4>
+<p>主要脚本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>scripts/train_tiny_gpt.py
+scripts/generate_poetry.py</code></pre></div>
+<p>特点：</p>
+<ul>
+<li>复用 Transformers 的 <code>GPT2LMHeadModel</code> 和 <code>Trainer</code>。</li>
+<li>模型权重仍然是随机初始化，不是加载预训练模型。</li>
+<li>适合正式训练、保存、恢复、评估和后续扩展。</li>
+</ul>
+<p>你应该优先用这条线跑完整训练。</p>
+<h4>手写 PyTorch 原理线</h4>
+<p>主要脚本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>scripts/train_pytorch_gpt.py
+scripts/generate_pytorch_gpt.py</code></pre></div>
+<p>特点：</p>
+<ul>
+<li>手写 token embedding、position embedding、causal self-attention、MLP、LayerNorm、训练循环。</li>
+<li>适合理解 Transformer 的内部结构。</li>
+<li>不追求工程功能完备，不建议作为长训练主力。</li>
+</ul>
+<p>你应该用这条线理解“模型到底在算什么”。</p>
+<h3>重要产物说明</h3>
+<h4>处理后的数据</h4>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>data/processed/poems_shi_ci_dedup.jsonl
+data/processed/pretrain_shi_ci_body.txt</code></pre></div>
+<p><code>poems_shi_ci_dedup.jsonl</code> 是结构化数据，每行一首或一阕，包含正文、题目、作者、朝代、来源等字段。</p>
+<p><code>pretrain_shi_ci_body.txt</code> 是纯正文文本，更适合训练 tokenizer 或正文语言模型。</p>
+<h4>tokenizer</h4>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-bpe-tokenizer/</code></pre></div>
+<p>里面通常有：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>tokenizer.json
+tokenizer_config.json
+vocab.json
+merges.txt</code></pre></div>
+<p>模型训练和生成都要用同一个 tokenizer。换 tokenizer 等于换了 token id 的语言，旧模型不能随便复用。</p>
+<h4>最终 HF 模型</h4>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/</code></pre></div>
+<p>关键文件：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>config.json
+generation_config.json
+model.safetensors
+tokenizer.json
+tokenizer_config.json
+training_args.bin
+train.log
+checkpoint-3000/
+checkpoint-4000/
+checkpoint-5000/</code></pre></div>
+<p><code>model.safetensors</code> 是最终权重；<code>config.json</code> 描述模型结构；<code>tokenizer.json</code> 让生成脚本知道如何把文字和 token id 互相转换。</p>
+<h4>验证产物</h4>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/verification/</code></pre></div>
+<p>这个目录来自一键验证脚本。它不是正式训练模型，而是小规模 smoke test，用来证明链路可靠。</p>
+<h3>本章检查点</h3>
+<p>读完这一章，你应该能回答：</p>
+<ul>
+<li><span class="qa-item" tabindex="0">训练用的数据在哪里？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">训练主数据在 <code>data/processed/poems_shi_ci_dedup.jsonl</code>，正文预训练文本在 <code>data/processed/pretrain_shi_ci_body.txt</code>。JSONL 适合保留结构字段，TXT 适合训练 tokenizer 和按正文训练。</span></span></li>
+<li><span class="qa-item" tabindex="0">tokenizer 和模型分别保存在哪里？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">tokenizer 保存在 <code>artifacts/poetry-bpe-tokenizer/</code>。Hugging Face 最终模型保存在 <code>artifacts/poetry-gpt-tiny-body/</code>，验证脚本的小模型和报告保存在 <code>artifacts/verification/</code>。</span></span></li>
+<li><span class="qa-item" tabindex="0">Hugging Face 工程线和手写 PyTorch 原理线有什么区别？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">Hugging Face 线复用成熟训练框架，适合稳定训练、保存、加载和扩展；手写 PyTorch 线把 GPT 的 embedding、attention、MLP、loss 和 generate 拆开实现，适合理解内部原理。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么最终模型目录需要同时有权重、配置和 tokenizer？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">权重保存学到的参数，配置描述模型结构，tokenizer 决定文字和 token id 的对应关系。三者必须匹配，否则模型可能无法加载，或能加载但生成结果混乱。</span></span></li>
+</ul>
+<p>下一章开始准备环境和检查数据。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-01-environment-and-data" data-title="环境与数据 01 环境与数据">
+  <div class="chapter-head">
+    <span>01_environment_and_data.md</span>
+    <h2>01 环境与数据</h2>
+    <p>配好 Python 3.11 环境，并确认诗词数据可用于训练。</p>
+  </div>
+  <div class="chapter-body">
+    <p>这一章解决两个问题：</p>
+<ul>
+<li>Python 和深度学习依赖是否能稳定运行。</li>
+<li>诗词数据是否已经准备成训练脚本能读的格式。</li>
+</ul>
+<h3>推荐环境</h3>
+<p>本项目默认本机 Mac 路线使用 Python 3.11：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>uv venv --python &quot;$HOME/.local/bin/python3.11&quot; .venv
+source .venv/bin/activate
+uv pip install --python .venv/bin/python -r requirements-training.txt</code></pre></div>
+<p>为什么强调 Python 3.11：</p>
+<ul>
+<li>深度学习库通常不会第一时间支持最新 Python。</li>
+<li>本机默认 Python 曾经出现过 3.14.x，这对 torch、transformers 等依赖有兼容风险。</li>
+<li>用明确路径创建 <code>.venv</code> 可以让环境可复现。</li>
+</ul>
+<p>如果环境已经建好，可以直接激活：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>source .venv/bin/activate</code></pre></div>
+<h3>环境检查</h3>
+<p>执行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/check_training_environment.py</code></pre></div>
+<p>这一步会检查：</p>
+<ul>
+<li>Python 版本。</li>
+<li><code>torch</code>、<code>transformers</code>、<code>datasets</code>、<code>tokenizers</code>、<code>accelerate</code> 是否能 import。</li>
+<li>torch 可用设备是 <code>mps</code>、<code>cuda</code> 还是 <code>cpu</code>。</li>
+<li>关键数据文件是否存在。</li>
+<li>JSONL 样本是否可解析。</li>
+<li>磁盘空间是否够。</li>
+</ul>
+<p>本项目已经跑通过一次，实际结果摘要：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>[PASS] Python version - 3.11.14
+[PASS] Import torch - 2.12.1
+[PASS] Import transformers - 5.12.1
+[PASS] Import datasets - 5.0.0
+[PASS] Import tokenizers - 0.22.2
+[PASS] Import accelerate - 1.14.0
+[PASS] Torch device - selected=mps cuda=False mps=True
+[PASS] Data file data/processed/poems_shi_ci_dedup.jsonl - 332.5 MB
+[PASS] Data file data/processed/pretrain_shi_ci_body.txt - 68.0 MB
+Environment check passed.</code></pre></div>
+<p>Mac 上看到 <code>selected=mps</code> 说明会优先使用 Apple Silicon GPU。看到 <code>cpu</code> 也可以跑验证，只是更慢。</p>
+<h3>Mac 上不要急着开 fp16/bf16</h3>
+<p>在 NVIDIA GPU 上，<code>fp16</code> 或 <code>bf16</code> 常用于提速和省显存。但本项目默认 Mac/MPS 路线建议先不用：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>不要加 --fp16
+不要加 --bf16</code></pre></div>
+<p>先把全流程跑通更重要。等你换到 CUDA 机器，再考虑混合精度。</p>
+<h3>数据来源</h3>
+<p>原始数据来自：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>data/raw/chinese-poetry/</code></pre></div>
+<p>项目已经把原始数据清洗成：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>data/processed/</code></pre></div>
+<p>关键文件：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>文件</th>
+<th>作用</th>
+</tr></thead><tbody>
+<tr>
+<td><code>data/processed/poems_shi_ci_dedup.jsonl</code></td>
+<td>严格诗词/词数据，结构化 JSONL。</td>
+</tr>
+<tr>
+<td><code>data/processed/pretrain_shi_ci_body.txt</code></td>
+<td>只包含正文的纯文本语料。</td>
+</tr>
+<tr>
+<td><code>data/processed/pretrain_shi_ci_with_meta.txt</code></td>
+<td>包含题目、作者、朝代等元信息的文本。</td>
+</tr>
+<tr>
+<td><code>data/processed/splits/train.jsonl</code></td>
+<td>固定训练集切分。</td>
+</tr>
+<tr>
+<td><code>data/processed/splits/validation.jsonl</code></td>
+<td>固定验证集切分。</td>
+</tr>
+<tr>
+<td><code>data/processed/stats.json</code></td>
+<td>清洗统计信息。</td>
+</tr>
+</tbody></table></div>
+<p>这次正式训练使用的是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>data/processed/poems_shi_ci_dedup.jsonl</code></pre></div>
+<p>tokenizer 训练使用的是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>data/processed/pretrain_shi_ci_body.txt</code></pre></div>
+<h3>查看一条 JSONL 样本</h3>
+<p>执行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python - &lt;&lt;&#x27;PY&#x27;
+import json
+
+with open(&quot;data/processed/poems_shi_ci_dedup.jsonl&quot;, encoding=&quot;utf-8&quot;) as f:
+    record = json.loads(next(f))
+
+for key, value in record.items():
+    print(f&quot;{key}: {value}&quot;)
+PY</code></pre></div>
+<p>你会看到类似字段：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>title
+author
+dynasty
+collection
+genre
+text</code></pre></div>
+<p>训练语言模型最关键的是 <code>text</code> 字段。它就是模型要学习的正文。</p>
+<h3>为什么有 JSONL 和 TXT 两种格式</h3>
+<p>JSONL 适合保留结构信息：</p>
+<div class="code-block" data-lang="json"><div class="code-head"><span>json</span><button type="button" class="copy-btn">复制</button></div><pre><code>{&quot;title&quot;: &quot;...&quot;, &quot;author&quot;: &quot;...&quot;, &quot;dynasty&quot;: &quot;...&quot;, &quot;text&quot;: &quot;...&quot;}</code></pre></div>
+<p>纯 TXT 适合训练 tokenizer 或正文语言模型：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春眠不觉晓，处处闻啼鸟。
+夜来风雨声，花落知多少。</code></pre></div>
+<p>如果你只想让模型续写诗词正文，TXT 或 JSONL 的 <code>text</code> 就够了。如果你想让模型根据“题目/作者/朝代”生成，就需要用带元信息的训练格式。</p>
+<h3>重新构建数据</h3>
+<p>如果你以后重新下载了原始仓库，或想修改清洗逻辑，可以运行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/build_poetry_corpus.py</code></pre></div>
+<p>常用选项：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/build_poetry_corpus.py --validation-percent 2
+python scripts/build_poetry_corpus.py --no-include-yuding</code></pre></div>
+<p>注意：重新构建数据可能改变训练集内容，也可能改变 tokenizer 和模型效果。如果你已经有一个模型在用，重新构建前最好保留旧的 <code>data/processed/</code> 和 <code>artifacts/</code>。</p>
+<h3>本章检查点</h3>
+<p>继续下一章前，请确认：</p>
+<ul>
+<li><span class="qa-item" tabindex="0"><code>python scripts/check_training_environment.py</code> 通过。<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">运行后应看到 Python、依赖、torch 设备、数据文件和样本记录检查通过；如果失败，先按输出修复缺失依赖、Python 版本或数据路径。</span></span></li>
+<li><span class="qa-item" tabindex="0"><code>data/processed/poems_shi_ci_dedup.jsonl</code> 存在。<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">这是去重后的结构化诗词语料，每行是一条 JSON 记录，训练和验证脚本会从这里抽取真实样本。</span></span></li>
+<li><span class="qa-item" tabindex="0"><code>data/processed/pretrain_shi_ci_body.txt</code> 存在。<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">这是抽取正文后的纯文本语料，适合训练 byte-level BPE tokenizer，也适合只按正文做语言模型预训练。</span></span></li>
+<li><span class="qa-item" tabindex="0">你能读取一条 JSONL 样本并看到 <code>text</code> 字段。<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">可以用 <code>python -m json.tool</code> 或小脚本读取第一行。看到 <code>text</code> 字段说明清洗产物保留了模型训练所需的正文内容。</span></span></li>
+</ul>
+<p>如果这些都通过，就可以训练 tokenizer。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-02-tokenizer" data-title="训练 Tokenizer 02 训练诗词 tokenizer">
+  <div class="chapter-head">
+    <span>02_tokenizer.md</span>
+    <h2>02 训练诗词 tokenizer</h2>
+    <p>理解 token、BPE 与 byte-level tokenizer，并完成中文诗词 tokenizer。</p>
+  </div>
+  <div class="chapter-body">
+    <p>模型不能直接读字符串。GPT 接收的是一串整数，也就是 token id。Tokenizer 的任务就是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>文字 &lt;-&gt; token id</code></pre></div>
+<p>例如：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春眠不觉晓，处处闻啼鸟。
+-&gt; [若干整数 token id]
+-&gt; 春眠不觉晓，处处闻啼鸟。</code></pre></div>
+<p>如果 tokenizer 不可靠，后面的模型训练都会跟着出问题。</p>
+<h3>什么是 token</h3>
+<p>token 是模型处理文本的最小单位之一。它不一定是一个字，也不一定是一个词。</p>
+<p>中文诗词里可能出现：</p>
+<ul>
+<li>单字：<code>春</code>、<code>月</code>、<code>山</code></li>
+<li>常见片段：<code>春风</code>、<code>明月</code>、<code>江南</code></li>
+<li>标点：<code>，</code>、<code>。</code></li>
+<li>生僻字或异体字的一部分编码</li>
+</ul>
+<p>tokenizer 会把文本拆成 token，再把 token 映射成整数 id。</p>
+<h3>为什么不用现成通用 tokenizer</h3>
+<p>可以用，但不一定最适合。诗词语料有几个特点：</p>
+<ul>
+<li>古汉语、繁体、异体字多。</li>
+<li>句子短，标点和换行有风格意义。</li>
+<li>常见组合和现代中文不同。</li>
+</ul>
+<p>自己训练一个 tokenizer，可以让词表更贴近诗词数据。</p>
+<h3>本项目使用 byte-level BPE</h3>
+<p>脚本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>scripts/train_tokenizer.py</code></pre></div>
+<p>它使用 byte-level BPE：</p>
+<ul>
+<li>byte-level：从字节层面兜底，遇到生僻字也不容易变成 unknown。</li>
+<li>BPE：把高频相邻片段逐步合并，让常见片段用更少 token 表示。</li>
+</ul>
+<p>这适合古诗词，因为生僻字和繁体字很多。</p>
+<h3>训练命令</h3>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tokenizer.py \
+  --input data/processed/pretrain_shi_ci_body.txt \
+  --output-dir artifacts/poetry-bpe-tokenizer \
+  --vocab-size 12000 \
+  --min-frequency 2</code></pre></div>
+<p>参数解释：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>参数</th>
+<th>含义</th>
+</tr></thead><tbody>
+<tr>
+<td><code>--input</code></td>
+<td>用来训练 tokenizer 的纯文本语料。</td>
+</tr>
+<tr>
+<td><code>--output-dir</code></td>
+<td>tokenizer 保存目录。</td>
+</tr>
+<tr>
+<td><code>--vocab-size</code></td>
+<td>词表大小。</td>
+</tr>
+<tr>
+<td><code>--min-frequency</code></td>
+<td>片段至少出现几次才参与合并。</td>
+</tr>
+</tbody></table></div>
+<p>本项目使用 <code>vocab-size=12000</code>。对于这个诗词语料，这是一个合适的入门值：太小会让序列变长，太大则稀疏且训练更重。</p>
+<h3>训练后产物</h3>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-bpe-tokenizer/
+├── merges.txt
+├── tokenizer.json
+├── tokenizer_config.json
+└── vocab.json</code></pre></div>
+<p>重要提醒：模型训练和生成必须使用同一个 tokenizer。模型权重学到的是“token id 的统计规律”，如果 tokenizer 改了，id 的含义也变了。</p>
+<h3>训练后应该看到什么</h3>
+<p>脚本会输出 probe：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>Saved tokenizer to: artifacts/poetry-bpe-tokenizer
+Vocab size: 12000
+Probe token count: 12
+Probe decoded: 春眠不觉晓，处处闻啼鸟。</code></pre></div>
+<p>这个 probe 非常重要。它说明：</p>
+<ul>
+<li>tokenizer 能 encode 中文。</li>
+<li>tokenizer 能 decode 回可读中文。</li>
+<li>标点和中文字符没有明显乱码。</li>
+</ul>
+<p>如果 decode 后变成一堆奇怪字符，不要继续训练模型，先修 tokenizer。</p>
+<h3>手动验证 tokenizer</h3>
+<p>你可以执行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python - &lt;&lt;&#x27;PY&#x27;
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained(&quot;artifacts/poetry-bpe-tokenizer&quot;)
+text = &quot;春眠不觉晓，处处闻啼鸟。&quot;
+ids = tokenizer(text, add_special_tokens=False)[&quot;input_ids&quot;]
+decoded = tokenizer.decode(ids)
+
+print(&quot;vocab_size:&quot;, len(tokenizer))
+print(&quot;ids:&quot;, ids)
+print(&quot;decoded:&quot;, decoded)
+PY</code></pre></div>
+<p>重点看：</p>
+<ul>
+<li><code>ids</code> 是否非空。</li>
+<li><code>decoded</code> 是否仍然可读。</li>
+<li><code>len(tokenizer)</code> 是否接近你设置的 <code>vocab-size</code>。</li>
+</ul>
+<h3>BPE 的直觉</h3>
+<p>BPE 可以理解为不断合并高频片段。</p>
+<p>一开始可能近似是字节或字符级：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春 / 风 / 又 / 绿 / 江 / 南 / 岸</code></pre></div>
+<p>如果 <code>春风</code> 很常见，就可能合并：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春风 / 又 / 绿 / 江南 / 岸</code></pre></div>
+<p>最终好处是：</p>
+<ul>
+<li>高频表达更短。</li>
+<li>同样 block size 能容纳更多文字。</li>
+<li>模型更容易学到常见诗词片段。</li>
+</ul>
+<p>但它也有边界：BPE 不理解语义，它只是统计合并。</p>
+<h3>常见问题</h3>
+<h4>vocab size 太小</h4>
+<p>现象：</p>
+<ul>
+<li>同一句诗被切成很多 token。</li>
+<li>训练时序列更长，效率下降。</li>
+</ul>
+<p>处理：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tokenizer.py --vocab-size 16000</code></pre></div>
+<p>不过换词表后需要重新训练模型。</p>
+<h4>vocab size 太大</h4>
+<p>现象：</p>
+<ul>
+<li>词表很多 token 很少出现。</li>
+<li>小模型训练更吃力。</li>
+</ul>
+<p>处理：先用 <code>8000</code> 到 <code>12000</code>，不要急着很大。</p>
+<h4>decode 不可读</h4>
+<p>现象：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>Probe decoded: æ˜¥çœ ...</code></pre></div>
+<p>处理：</p>
+<ul>
+<li>确认用的是项目脚本训练的 byte-level BPE。</li>
+<li>确认 <code>tokenizer.json</code>、<code>vocab.json</code>、<code>merges.txt</code> 来自同一次训练。</li>
+<li>重新运行 <code>scripts/train_tokenizer.py</code>。</li>
+</ul>
+<h3>本章检查点</h3>
+<p>继续训练模型前，请确认：</p>
+<ul>
+<li><span class="qa-item" tabindex="0"><code>artifacts/poetry-bpe-tokenizer/tokenizer.json</code> 存在。<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">这个文件是 tokenizer 的核心产物，后续训练和生成都会用它把中文文本编码成 token id，并把模型输出解码回文字。</span></span></li>
+<li><span class="qa-item" tabindex="0">tokenizer vocab size 是 12000 左右。<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">当前教程使用约 12000 的词表。这个规模对诗词 tiny 模型比较轻量，同时能覆盖常见中文字符、标点和 byte-level fallback。</span></span></li>
+<li><span class="qa-item" tabindex="0"><code>春眠不觉晓，处处闻啼鸟。</code> encode/decode 后仍可读。<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">这说明 tokenizer 对中文往返转换正常。decode 不要求逐字完全相同，但不应该出现大段乱码或不可读字符。</span></span></li>
+</ul>
+<p>下一章进入 Hugging Face 工程线，训练一个完整可加载的 GPT 模型。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-03-hf-pretraining" data-title="HF 工程线 03 Hugging Face 工程线：从零训练 GPT">
+  <div class="chapter-head">
+    <span>03_hf_pretraining.md</span>
+    <h2>03 Hugging Face 工程线：从零训练 GPT</h2>
+    <p>用 Hugging Face 从随机初始化训练一个完整 GPT。</p>
+  </div>
+  <div class="chapter-body">
+    <p>这一章用 <code>scripts/train_tiny_gpt.py</code> 训练一个 GPT 风格的 causal language model。它使用 Hugging Face 的模型和 Trainer，但模型权重是随机初始化的，不是从已有大模型继续训练。</p>
+<h3>本章目标</h3>
+<p>你会跑通：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>数据 -&gt; tokenizer -&gt; token blocks -&gt; GPT forward -&gt; loss -&gt; optimizer -&gt; checkpoint -&gt; final model</code></pre></div>
+<p>最终得到一个目录：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/</code></pre></div>
+<p>这个目录就是完整模型，可以用 <code>scripts/generate_poetry.py</code> 加载并生成文本。</p>
+<h3>训练脚本做了什么</h3>
+<p>核心脚本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>scripts/train_tiny_gpt.py</code></pre></div>
+<p>它主要做这些事：</p>
+<ol>
+<li>读取 JSONL 或 TXT 语料。</li>
+<li>用 tokenizer 把文本变成 token id。</li>
+<li>把所有 token 拼接后切成固定长度 block。</li>
+<li>创建 GPT2Config。</li>
+<li>随机初始化 GPT2LMHeadModel。</li>
+<li>用 Trainer 做训练、评估和保存。</li>
+<li>保存最终模型和 tokenizer。</li>
+</ol>
+<h3>下一个 token 预测</h3>
+<p>GPT 训练的目标是根据前文预测下一个 token：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>输入：春 眠 不 觉 晓 ， 处 处 闻 啼
+目标：眠 不 觉 晓 ， 处 处 闻 啼 鸟</code></pre></div>
+<p>训练时模型输出每个位置上“下一个 token 是谁”的概率分布。正确 token 概率越低，loss 越高。</p>
+<p>使用的 loss 是 cross entropy。</p>
+<h3>先跑 smoke test</h3>
+<p>正式训练前，先跑很小的测试：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-nano-smoke \
+  --model-size nano \
+  --block-size 128 \
+  --max-steps 200 \
+  --per-device-train-batch-size 8 \
+  --per-device-eval-batch-size 8 \
+  --gradient-accumulation-steps 2 \
+  --learning-rate 5e-4 \
+  --logging-steps 20 \
+  --eval-steps 100 \
+  --save-steps 200</code></pre></div>
+<p>smoke test 的目的不是训练出好模型，而是确认：</p>
+<ul>
+<li>数据能读。</li>
+<li>tokenizer 能用。</li>
+<li>模型能 forward/backward。</li>
+<li>loss 是有限数值。</li>
+<li>checkpoint 能保存。</li>
+</ul>
+<h3>正式 tiny 正文模型</h3>
+<p>本项目已经跑通的正式命令是：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-tiny-body \
+  --model-size tiny \
+  --block-size 256 \
+  --max-steps 5000 \
+  --per-device-train-batch-size 8 \
+  --per-device-eval-batch-size 8 \
+  --gradient-accumulation-steps 4 \
+  --learning-rate 5e-4 \
+  --warmup-ratio 0.03 \
+  --weight-decay 0.1 \
+  --logging-steps 100 \
+  --eval-steps 500 \
+  --save-steps 1000 \
+  --save-total-limit 3</code></pre></div>
+<h3>关键参数解释</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>参数</th>
+<th>含义</th>
+<th>本次设置</th>
+</tr></thead><tbody>
+<tr>
+<td><code>--model-size</code></td>
+<td>模型规模预设。</td>
+<td><code>tiny</code></td>
+</tr>
+<tr>
+<td><code>--block-size</code></td>
+<td>每个训练样本的 token 长度。</td>
+<td><code>256</code></td>
+</tr>
+<tr>
+<td><code>--max-steps</code></td>
+<td>总训练步数。</td>
+<td><code>5000</code></td>
+</tr>
+<tr>
+<td><code>--per-device-train-batch-size</code></td>
+<td>每次前向的 batch size。</td>
+<td><code>8</code></td>
+</tr>
+<tr>
+<td><code>--gradient-accumulation-steps</code></td>
+<td>累积多少次梯度再更新。</td>
+<td><code>4</code></td>
+</tr>
+<tr>
+<td><code>--learning-rate</code></td>
+<td>最大学习率。</td>
+<td><code>5e-4</code></td>
+</tr>
+<tr>
+<td><code>--warmup-ratio</code></td>
+<td>前多少比例逐步升学习率。</td>
+<td><code>0.03</code></td>
+</tr>
+<tr>
+<td><code>--weight-decay</code></td>
+<td>权重衰减，帮助正则化。</td>
+<td><code>0.1</code></td>
+</tr>
+<tr>
+<td><code>--eval-steps</code></td>
+<td>每多少 step 验证一次。</td>
+<td><code>500</code></td>
+</tr>
+<tr>
+<td><code>--save-steps</code></td>
+<td>每多少 step 保存 checkpoint。</td>
+<td><code>1000</code></td>
+</tr>
+</tbody></table></div>
+<p>有效 batch size 约等于：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>per_device_train_batch_size * gradient_accumulation_steps
+= 8 * 4
+= 32</code></pre></div>
+<h3>tiny 模型结构</h3>
+<p><code>tiny</code> 预设：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>n_layer = 4
+n_head = 4
+n_embd = 256</code></pre></div>
+<p>含义：</p>
+<ul>
+<li><code>n_layer</code>：Transformer block 层数。</li>
+<li><code>n_head</code>：每层 self-attention 的头数。</li>
+<li><code>n_embd</code>：每个 token 的向量维度。</li>
+</ul>
+<p>本次参数量约 6.30M。它很小，所以能在 Mac 上跑通；但也因为小，生成质量有限。</p>
+<h3>block size 是什么</h3>
+<p><code>block-size=256</code> 表示每个训练样本最多包含 256 个 token。</p>
+<p>模型在一个 block 内学习：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>第 1 个 token 预测第 2 个
+第 2 个 token 预测第 3 个
+...
+第 255 个 token 预测第 256 个</code></pre></div>
+<p>block size 越大，模型能看见的上下文越长，但显存和计算开销也越大。</p>
+<h3>训练时看什么</h3>
+<p>日志里重点看：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>loss
+eval_loss
+grad_norm
+learning_rate</code></pre></div>
+<h4>loss</h4>
+<p>训练集损失。整体应该下降，但局部会上下波动。</p>
+<h4>eval_loss</h4>
+<p>验证集损失。更适合判断模型是否泛化。它也应该整体下降。</p>
+<h4>grad_norm</h4>
+<p>梯度范数。极端爆炸时可能出现异常大数值，并伴随 loss 变成 <code>nan</code>。</p>
+<h4>learning_rate</h4>
+<p>本项目使用 cosine schedule：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>warmup -&gt; 达到最高学习率 -&gt; 逐步衰减</code></pre></div>
+<h3>本次真实训练结果</h3>
+<p>训练产物：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/</code></pre></div>
+<p>结果摘要：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>指标</th>
+<th>数值</th>
+</tr></thead><tbody>
+<tr>
+<td>参数量</td>
+<td>约 6.30M</td>
+</tr>
+<tr>
+<td>词表</td>
+<td>12000</td>
+</tr>
+<tr>
+<td>训练 blocks</td>
+<td>84007</td>
+</tr>
+<tr>
+<td>验证 blocks</td>
+<td>863</td>
+</tr>
+<tr>
+<td>训练步数</td>
+<td>5000</td>
+</tr>
+<tr>
+<td>训练耗时</td>
+<td>1649 秒</td>
+</tr>
+<tr>
+<td>首个训练 loss</td>
+<td>7.9845</td>
+</tr>
+<tr>
+<td>最终训练 loss</td>
+<td>5.4444</td>
+</tr>
+<tr>
+<td>首个验证 loss</td>
+<td>6.3748</td>
+</tr>
+<tr>
+<td>最终验证 loss</td>
+<td>5.3364</td>
+</tr>
+</tbody></table></div>
+<p>loss 下降说明链路健康，模型确实在学习诗词语料的统计规律。</p>
+<h3>最终模型目录</h3>
+<p>训练完成后，目录里有：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/
+├── config.json
+├── generation_config.json
+├── model.safetensors
+├── tokenizer.json
+├── tokenizer_config.json
+├── train.log
+├── training_args.bin
+├── checkpoint-3000/
+├── checkpoint-4000/
+└── checkpoint-5000/</code></pre></div>
+<p>一个完整可加载模型至少需要：</p>
+<ul>
+<li><code>model.safetensors</code>：权重。</li>
+<li><code>config.json</code>：模型结构。</li>
+<li>tokenizer 文件：文本和 token id 的映射。</li>
+</ul>
+<h3>继续训练或恢复训练</h3>
+<p>如果训练中断，可以从 checkpoint 恢复：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-tiny-body \
+  --model-size tiny \
+  --block-size 256 \
+  --max-steps 8000 \
+  --resume-from-checkpoint artifacts/poetry-gpt-tiny-body/checkpoint-5000</code></pre></div>
+<p>注意：恢复训练时，模型结构、tokenizer、block size 最好保持一致。</p>
+<h3>训练带元信息的模型</h3>
+<p>如果你希望模型根据题目、作者、朝代等条件生成，可以加 <code>--with-meta</code>：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-tiny-meta \
+  --model-size tiny \
+  --block-size 256 \
+  --max-steps 5000 \
+  --per-device-train-batch-size 8 \
+  --gradient-accumulation-steps 4 \
+  --learning-rate 5e-4 \
+  --with-meta</code></pre></div>
+<p>训练文本会变成类似：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>题目：秋夜
+作者：某某
+朝代：唐
+正文...</code></pre></div>
+<p>这能让模型学习“元信息 -&gt; 正文”的模式。</p>
+<h3>本章检查点</h3>
+<p>你应该能回答：</p>
+<ul>
+<li><span class="qa-item" tabindex="0">为什么这个模型仍然是“从零训练”？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">因为只使用了 GPT2 风格结构和训练工具，模型权重是随机初始化的，没有加载别人预训练好的 checkpoint。</span></span></li>
+<li><span class="qa-item" tabindex="0"><code>block-size</code> 和 <code>gradient-accumulation-steps</code> 分别影响什么？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note"><code>block-size</code> 决定单次输入上下文长度，也影响显存和位置编码范围；<code>gradient-accumulation-steps</code> 会累计多次小 batch 的梯度，近似更大的 batch size。</span></span></li>
+<li><span class="qa-item" tabindex="0">训练 loss 和 eval loss 有什么区别？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">训练 loss 来自训练 batch，会被优化器直接拿来更新参数；eval loss 来自验证集，不参与更新，更适合观察泛化能力和是否过拟合。</span></span></li>
+<li><span class="qa-item" tabindex="0">最终模型目录为什么需要同时保存权重、配置和 tokenizer？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">权重、配置、tokenizer 分别回答“参数是什么”“结构是什么”“文字如何变成 id”。生成时缺任何一个，都无法可靠复现训练出的模型。</span></span></li>
+</ul>
+<p>下一章我们转到手写 PyTorch GPT，拆开看 Transformer 内部逻辑。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-04-pytorch-gpt-from-scratch" data-title="手写 PyTorch GPT 04 手写 PyTorch GPT：理解 Transformer 内部">
+  <div class="chapter-head">
+    <span>04_pytorch_gpt_from_scratch.md</span>
+    <h2>04 手写 PyTorch GPT：理解 Transformer 内部</h2>
+    <p>拆开 Transformer 内部结构，理解 GPT 到底在算什么。</p>
+  </div>
+  <div class="chapter-body">
+    <p>Hugging Face 工程线能稳定完成训练，但很多细节被封装起来了。为了理解模型内部，本项目提供了一个教学版手写 GPT：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>scripts/train_pytorch_gpt.py
+scripts/generate_pytorch_gpt.py</code></pre></div>
+<p>这版不追求工程功能最全，而是把核心结构摊开给你看。</p>
+<h3>手写版模型结构</h3>
+<p>核心类：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>GPTConfig
+CausalSelfAttention
+MLP
+Block
+PoetryGPT</code></pre></div>
+<p>整体结构：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>token ids
+  -&gt; token embedding
+  -&gt; position embedding
+  -&gt; Transformer Block x N
+       -&gt; LayerNorm
+       -&gt; Causal Self-Attention
+       -&gt; residual connection
+       -&gt; LayerNorm
+       -&gt; MLP
+       -&gt; residual connection
+  -&gt; final LayerNorm
+  -&gt; LM head
+  -&gt; logits
+  -&gt; cross entropy loss</code></pre></div>
+<h3>token embedding</h3>
+<p>token id 是整数，模型不能直接计算语义，所以先查表变成向量：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>id 1420 -&gt; [0.03, -0.01, ...]</code></pre></div>
+<p>代码中对应：</p>
+<div class="code-block" data-lang="python"><div class="code-head"><span>python</span><button type="button" class="copy-btn">复制</button></div><pre><code>self.token_embedding = nn.Embedding(config.vocab_size, config.n_embd)</code></pre></div>
+<p>如果 <code>n_embd=128</code>，每个 token 会变成 128 维向量。</p>
+<h3>position embedding</h3>
+<p>Transformer 本身不天然知道 token 的顺序，所以要加入位置信息：</p>
+<div class="code-block" data-lang="python"><div class="code-head"><span>python</span><button type="button" class="copy-btn">复制</button></div><pre><code>self.position_embedding = nn.Embedding(config.block_size, config.n_embd)</code></pre></div>
+<p>最终输入向量是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>token embedding + position embedding</code></pre></div>
+<p>这让模型能区分“春风”里第一个字和后面的字，也能感知一句诗中不同位置的节奏。</p>
+<h3>causal self-attention</h3>
+<p>self-attention 让每个 token 看上下文。GPT 的关键是 causal mask：当前位置只能看自己和之前的 token，不能偷看未来答案。</p>
+<p>直觉：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>预测第 5 个 token 时，只能看第 1 到第 4 个 token。</code></pre></div>
+<p>代码中有一个下三角 mask：</p>
+<div class="code-block" data-lang="python"><div class="code-head"><span>python</span><button type="button" class="copy-btn">复制</button></div><pre><code>mask = torch.tril(torch.ones(config.block_size, config.block_size))</code></pre></div>
+<p>它会挡住未来位置：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>可看：
+1
+1 1
+1 1 1
+1 1 1 1
+
+不可看未来：
+0 出现在上三角</code></pre></div>
+<h3>多头注意力</h3>
+<p><code>n_head=4</code> 表示把 embedding 分成 4 个头，每个头学习不同的关系。</p>
+<p>一个头可能更关注韵脚，一个头可能更关注常见搭配，一个头可能更关注短距离词序。这个解释是直觉，不是显式规则；模型自己从数据中学习。</p>
+<p>要求：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>n_embd % n_head == 0</code></pre></div>
+<p>例如：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>n_embd = 128
+n_head = 4
+每个 head 的维度 = 32</code></pre></div>
+<h3>MLP</h3>
+<p>attention 负责混合上下文信息，MLP 负责对每个位置的向量做非线性变换：</p>
+<div class="code-block" data-lang="python"><div class="code-head"><span>python</span><button type="button" class="copy-btn">复制</button></div><pre><code>Linear(n_embd, 4 * n_embd)
+GELU()
+Linear(4 * n_embd, n_embd)</code></pre></div>
+<p>它让模型不只是线性组合上下文，还能表达更复杂的模式。</p>
+<h3>LayerNorm 和 residual connection</h3>
+<p>每个 block 里有：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>x = x + attention(layer_norm(x))
+x = x + mlp(layer_norm(x))</code></pre></div>
+<p><code>LayerNorm</code> 让数值更稳定。<code>x + ...</code> 是残差连接，让梯度更容易穿过很多层。</p>
+<h3>LM head</h3>
+<p>最终要预测下一个 token，所以每个位置都要输出一个长度为 vocab size 的向量：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>logits shape = [batch, seq_len, vocab_size]</code></pre></div>
+<p>如果 vocab size 是 12000，每个位置都会输出 12000 个分数。分数最高的 token 就是模型认为最可能的下一个 token。</p>
+<h3>cross entropy loss</h3>
+<p>训练时我们知道正确答案。比如输入：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春 眠 不 觉 晓</code></pre></div>
+<p>目标是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>眠 不 觉 晓 ，</code></pre></div>
+<p>cross entropy 会惩罚模型没有把概率分给正确 token。loss 越低，说明模型越会预测训练数据里的下一个 token。</p>
+<h3>训练手写版</h3>
+<p>默认教学参数：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_pytorch_gpt.py \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-pytorch \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --block-size 128 \
+  --n-layer 2 \
+  --n-head 4 \
+  --n-embd 128 \
+  --batch-size 16 \
+  --max-steps 200 \
+  --eval-interval 50 \
+  --learning-rate 3e-4</code></pre></div>
+<p>如果想快速试跑：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_pytorch_gpt.py \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-pytorch-smoke \
+  --max-records 1000 \
+  --max-steps 20 \
+  --block-size 64 \
+  --batch-size 8</code></pre></div>
+<h3>手写版生成</h3>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/generate_pytorch_gpt.py \
+  --checkpoint artifacts/poetry-gpt-pytorch/model.pt \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --prompt &quot;春风&quot; \
+  --max-new-tokens 120</code></pre></div>
+<h3>手写版和 HF 版的区别</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>维度</th>
+<th>Hugging Face 版</th>
+<th>手写 PyTorch 版</th>
+</tr></thead><tbody>
+<tr>
+<td>目标</td>
+<td>稳定训练与工程复现</td>
+<td>教学理解</td>
+</tr>
+<tr>
+<td>模型</td>
+<td>GPT2LMHeadModel</td>
+<td>PoetryGPT</td>
+</tr>
+<tr>
+<td>训练器</td>
+<td>Trainer</td>
+<td>手写 loop</td>
+</tr>
+<tr>
+<td>保存</td>
+<td>HF 标准目录</td>
+<td><code>model.pt</code> + config</td>
+</tr>
+<tr>
+<td>恢复训练</td>
+<td>更方便</td>
+<td>需要自己扩展</td>
+</tr>
+<tr>
+<td>长训练推荐</td>
+<td>是</td>
+<td>否</td>
+</tr>
+</tbody></table></div>
+<p>实际学习顺序建议：</p>
+<ol>
+<li>用 HF 版跑通全流程。</li>
+<li>用手写版理解每个模块。</li>
+<li>回到 HF 版做正式实验。</li>
+</ol>
+<h3>建议你读代码时关注的函数</h3>
+<p>按这个顺序读：</p>
+<ol>
+<li><code>GPTConfig</code>：模型超参数。</li>
+<li><code>PoetryGPT.__init__</code>：模型由哪些层组成。</li>
+<li><code>PoetryGPT.forward</code>：输入如何变成 logits 和 loss。</li>
+<li><code>CausalSelfAttention.forward</code>：Q/K/V、mask、attention weights。</li>
+<li><code>PoetryGPT.generate</code>：如何逐 token 采样。</li>
+<li>训练循环：如何取 batch、反向传播、更新参数、评估、保存。</li>
+</ol>
+<h3>本章检查点</h3>
+<p>你应该能回答：</p>
+<ul>
+<li><span class="qa-item" tabindex="0">为什么 GPT 需要 causal mask？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">GPT 做的是下一个 token 预测。causal mask 会遮住未来位置，确保每个位置只能看当前和过去，训练时不能偷看答案。</span></span></li>
+<li><span class="qa-item" tabindex="0">token embedding 和 position embedding 分别解决什么问题？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">token embedding 把离散 token id 变成连续向量；position embedding 给每个位置加入顺序信息，否则 self-attention 本身不知道 token 的先后。</span></span></li>
+<li><span class="qa-item" tabindex="0">logits 的最后一维为什么等于 vocab size？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">每个位置都要预测“下一个 token 是词表里的哪一个”。因此 logits 最后一维必须给出词表中每个 token 的分数。</span></span></li>
+<li><span class="qa-item" tabindex="0">cross entropy loss 在比较什么？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">它比较模型预测的 token 概率分布和真实下一个 token。真实 token 概率越低，loss 越高；模型越确信正确答案，loss 越低。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么手写版适合理解，但正式训练更推荐 HF 版？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">手写版代码短、结构透明，适合理解原理和小实验；HF 版在 checkpoint、评估、恢复训练、日志、设备适配等工程环节更稳，更适合长期训练。</span></span></li>
+</ul>
+<p>下一章进入验证链路：如何确信整个流程不是“看起来跑了”，而是真的可复现。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-05-verification-and-testing" data-title="验证与测试 05 验证与测试：保证流程真的可复现">
+  <div class="chapter-head">
+    <span>05_verification_and_testing.md</span>
+    <h2>05 验证与测试：保证流程真的可复现</h2>
+    <p>用环境检查、smoke test 和报告确认链路可复现。</p>
+  </div>
+  <div class="chapter-body">
+    <p>训练模型最怕“命令好像跑完了，但某一步其实不可靠”。所以本项目专门加入了验证脚本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>scripts/check_training_environment.py
+scripts/verify_pretraining_pipeline.py</code></pre></div>
+<p>这一章教你怎么使用这些脚本，以及如何阅读结果。</p>
+<h3>第一层：环境检查</h3>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/check_training_environment.py</code></pre></div>
+<p>它检查：</p>
+<ul>
+<li>Python 版本。</li>
+<li>依赖是否能 import。</li>
+<li>torch 设备。</li>
+<li>数据文件是否存在。</li>
+<li>JSONL 样本是否可解析。</li>
+<li>磁盘空间。</li>
+</ul>
+<p>如果这一步失败，先不要训练模型。环境问题会在后面变成更难定位的问题。</p>
+<h3>第二层：脚本语法检查</h3>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python -m py_compile scripts/*.py</code></pre></div>
+<p>这一步确认所有脚本至少语法正确，能被 Python 编译。</p>
+<p>本项目这一步已经通过。</p>
+<h3>第三层：一键验证全链路</h3>
+<p>运行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/verify_pretraining_pipeline.py --backend both --max-steps 120</code></pre></div>
+<p>也可以分开：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/verify_pretraining_pipeline.py --backend hf --max-steps 120
+python scripts/verify_pretraining_pipeline.py --backend pytorch --max-steps 120</code></pre></div>
+<p>它会做这些事：</p>
+<ol>
+<li>从真实 <code>poems_shi_ci_dedup.jsonl</code> 抽取小子集。</li>
+<li>生成小型训练文本。</li>
+<li>训练一个小 tokenizer。</li>
+<li>验证 tokenizer 中文往返。</li>
+<li>跑 HF 版 2-step smoke test。</li>
+<li>跑 HF 版 120-step short train。</li>
+<li>加载 HF checkpoint 生成文本。</li>
+<li>跑手写 PyTorch 版 smoke test。</li>
+<li>跑手写 PyTorch 版 short train。</li>
+<li>加载 PyTorch checkpoint 生成文本。</li>
+<li>写出验证报告。</li>
+</ol>
+<p>产物在：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/verification/</code></pre></div>
+<p>重要文件：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/verification/verification_report.md
+artifacts/verification/hf_generated.txt
+artifacts/verification/pytorch_generated.txt
+artifacts/verification/logs/</code></pre></div>
+<h3>验证结果如何判断</h3>
+<p>报告里会出现：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>PASS
+WARN
+FAIL</code></pre></div>
+<p>含义：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>状态</th>
+<th>含义</th>
+</tr></thead><tbody>
+<tr>
+<td><code>PASS</code></td>
+<td>这一步通过。</td>
+</tr>
+<tr>
+<td><code>WARN</code></td>
+<td>流程能跑，但有需要注意的现象。</td>
+</tr>
+<tr>
+<td><code>FAIL</code></td>
+<td>这一步失败，需要看日志。</td>
+</tr>
+</tbody></table></div>
+<p>短训练里 loss 不明显下降时通常是 <code>WARN</code>，不是一定失败。因为 100 到 200 step 太短，波动很正常。</p>
+<p>真正危险的是：</p>
+<ul>
+<li>loss 是 <code>nan</code> 或 <code>inf</code>。</li>
+<li>checkpoint 没保存。</li>
+<li>保存后不能加载。</li>
+<li>生成文本为空。</li>
+<li>生成文本完全不含中文。</li>
+<li>数据或 tokenizer 解析失败。</li>
+</ul>
+<h3>本项目已经跑通的验证结果</h3>
+<p>之前已完成一键验证：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/verification/verification_report.md</code></pre></div>
+<p>摘要：</p>
+<ul>
+<li>HF 版短训练 loss：7.8746 -&gt; 6.7423</li>
+<li>PyTorch 版短训练 loss：8.2938 -&gt; 7.0136</li>
+<li>failures：0</li>
+<li>warnings：0</li>
+</ul>
+<p>这说明工程线和原理线都能在真实诗词子集上完成训练、保存、加载和生成。</p>
+<h3>正式训练后的验证</h3>
+<p>正式训练模型：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/</code></pre></div>
+<p>训练后我们又做了这些验证：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>python -m py_compile scripts/*.py
+python scripts/check_training_environment.py
+python scripts/generate_poetry.py --model-dir artifacts/poetry-gpt-tiny-body --prompt &quot;春风&quot;</code></pre></div>
+<p>结果：</p>
+<ul>
+<li>脚本语法：PASS</li>
+<li>环境检查：PASS</li>
+<li>最终模型加载：PASS</li>
+<li>CLI 生成：PASS</li>
+<li>生成样本：18 条全部非空且包含中文</li>
+</ul>
+<p>正式训练报告：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/training_run_report.md</code></pre></div>
+<h3>如何读 loss 曲线</h3>
+<p>这次正式训练：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>训练 loss: 7.9845 -&gt; 5.4444
+验证 loss: 6.3748 -&gt; 5.3364</code></pre></div>
+<p>这说明：</p>
+<ul>
+<li>模型不是随机输出，确实学到了诗词分布。</li>
+<li>训练和验证都下降，暂时没有明显过拟合信号。</li>
+<li>但 loss 仍然不低，说明生成质量还有提升空间。</li>
+</ul>
+<p>不要只看最后一次生成样本来判断训练健康。生成样本有随机性，loss 趋势更重要。</p>
+<h3>如果验证失败怎么办</h3>
+<h4>依赖 import 失败</h4>
+<p>处理：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>source .venv/bin/activate
+uv pip install --python .venv/bin/python -r requirements-training.txt</code></pre></div>
+<p>确认不是在系统 Python 里运行。</p>
+<h4>数据文件不存在</h4>
+<p>检查：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>ls data/processed/</code></pre></div>
+<p>如果确实缺失，重新构建：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/build_poetry_corpus.py</code></pre></div>
+<h4>tokenizer decode 乱码</h4>
+<p>重新训练 tokenizer：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tokenizer.py</code></pre></div>
+<p>确认生成目录是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-bpe-tokenizer/</code></pre></div>
+<h4>loss 是 nan</h4>
+<p>常见原因：</p>
+<ul>
+<li>学习率过大。</li>
+<li>混合精度不稳定。</li>
+<li>数据异常。</li>
+<li>梯度爆炸。</li>
+</ul>
+<p>优先处理：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>降低 learning-rate
+不要在 Mac/MPS 上启用 fp16/bf16
+减小 batch size
+跑更小 smoke test 定位</code></pre></div>
+<h4>生成为空</h4>
+<p>检查：</p>
+<ul>
+<li>模型目录是否正确。</li>
+<li>tokenizer 是否和模型来自同一套训练。</li>
+<li><code>max-new-tokens</code> 是否太小。</li>
+<li>prompt 是否为空。</li>
+</ul>
+<h3>建议的验证习惯</h3>
+<p>每次大改动后按这个顺序：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python -m py_compile scripts/*.py
+python scripts/check_training_environment.py
+python scripts/verify_pretraining_pipeline.py --backend both --max-steps 120</code></pre></div>
+<p>每次正式训练后：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/generate_poetry.py \
+  --model-dir artifacts/你的模型目录 \
+  --prompt &quot;春风&quot; \
+  --num-return-sequences 3</code></pre></div>
+<p>再把训练命令、loss、样本和模型路径记录下来。模型实验最怕“几天后忘了这个模型怎么来的”。</p>
+<h3>本章检查点</h3>
+<p>你应该能回答：</p>
+<ul>
+<li><span class="qa-item" tabindex="0">smoke test 和正式训练有什么区别？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">smoke test 用很小数据和极少步数确认链路能跑通；正式训练使用更完整语料、更长步数和更严格评估，目标是提升模型质量。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么短训练 loss 不下降只能算 warning？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">100 到 200 step 很短，loss 会受采样、初始化和学习率波动影响。不下降需要关注，但只要 loss 有限、能保存加载和生成，就说明流程本身不一定坏。</span></span></li>
+<li><span class="qa-item" tabindex="0">怎样判断 checkpoint 是否真的可用？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">至少要检查文件存在、能用同一配置和 tokenizer 加载、能跑 forward 或 generate，并且生成结果非空、包含可读中文。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么生成样本不能替代 loss 和验证脚本？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">生成样本是随机且主观的，只能看个案；loss、加载检查和自动验证能更系统地发现训练崩溃、保存损坏、tokenizer 不匹配等问题。</span></span></li>
+</ul>
+<p>下一章开始使用最终模型生成诗词，并理解采样参数。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-06-generation-and-evaluation" data-title="生成与评估 06 生成与评估：模型能输出什么">
+  <div class="chapter-head">
+    <span>06_generation_and_evaluation.md</span>
+    <h2>06 生成与评估：模型能输出什么</h2>
+    <p>用最终模型生成诗词，理解采样参数和质量边界。</p>
+  </div>
+  <div class="chapter-body">
+    <p>训练结束后，模型可以根据 prompt 逐 token 生成文本。这个阶段不再更新参数，只做推理。</p>
+<p>本项目正式模型在：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/</code></pre></div>
+<p>生成脚本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>scripts/generate_poetry.py</code></pre></div>
+<h3>基础生成命令</h3>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/generate_poetry.py \
+  --model-dir artifacts/poetry-gpt-tiny-body \
+  --prompt &quot;春风&quot; \
+  --max-new-tokens 120 \
+  --temperature 0.88 \
+  --top-p 0.92 \
+  --top-k 50 \
+  --repetition-penalty 1.08 \
+  --num-return-sequences 3</code></pre></div>
+<p>输出类似：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>--- sample 1 ---
+春风。
+对酒成杯，满妆春浅。
+愁无别恨，醉歌清乐。
+一个难问，空应、人间真处。
+
+--- sample 2 ---
+春风。
+不尽东风，争与谁为醉。
+叹江南春。
+更见金筝，且将歌酒。
+欲怜寒梦，还自远、满江东。</code></pre></div>
+<h3>采样参数解释</h3>
+<h4>max-new-tokens</h4>
+<p>最多生成多少新 token。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>越大：文本更长，但更容易跑偏。
+越小：更短，更像片段。</code></pre></div>
+<p>诗词小模型建议先用：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>80 到 160</code></pre></div>
+<h4>temperature</h4>
+<p>控制随机性。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>低：更保守，更容易重复常见表达。
+高：更多变化，也更容易不通顺。</code></pre></div>
+<p>常用范围：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>0.7 到 1.0</code></pre></div>
+<h4>top-k</h4>
+<p>每一步只从概率最高的 k 个 token 中采样。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>top-k=50</code></pre></div>
+<p>表示只考虑前 50 个候选。</p>
+<h4>top-p</h4>
+<p>也叫 nucleus sampling。它不是固定候选数量，而是保留累计概率达到 p 的候选。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>top-p=0.92</code></pre></div>
+<p>通常比纯 top-k 更灵活。</p>
+<h4>repetition-penalty</h4>
+<p>惩罚重复 token。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>1.0：不惩罚
+1.05 到 1.15：轻微减少重复
+太高：可能破坏文本自然性</code></pre></div>
+<h3>本次生成的样本文件</h3>
+<p>这次训练后，已经保存了两份样本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/generated_samples.txt
+artifacts/poetry-gpt-tiny-body/generated_samples.jsonl</code></pre></div>
+<p><code>txt</code> 方便人读，<code>jsonl</code> 方便后续程序评估。</p>
+<p>这次共生成：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>18 条样本
+18 条非空
+18 条包含中文</code></pre></div>
+<h3>实际样本节选</h3>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春风，醉饮东风。
+待酒满来多旧里，争思两重倾。
+愁时对、犹成清绝。
+花面点红绡。
+问长恨。
+谁能与、似说花头。</code></pre></div>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>明月，白雲深處獨吟清。
+梅花影裏新消息，爲取花前作主人。</code></pre></div>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>秋夜，霜林暗亂啼。
+寒蛩鳴鳥響，風鵲靜涼飛。
+野草新香暖，山池雨易低。
+更看龍鶴，應入虎樓。</code></pre></div>
+<p>这些样本已经有诗词腔调、意象和句式，但也能看出 tiny 短训练模型的局限：有些句子语义松散，有些搭配像古诗词但不够精炼。</p>
+<h3>如何批量生成自己的样本</h3>
+<p>可以用 shell 循环：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>for prompt in 春风 明月 江南 秋夜 山中 故人; do
+  python scripts/generate_poetry.py \
+    --model-dir artifacts/poetry-gpt-tiny-body \
+    --prompt &quot;$prompt&quot; \
+    --max-new-tokens 120 \
+    --temperature 0.88 \
+    --top-p 0.92 \
+    --num-return-sequences 3
+done</code></pre></div>
+<p>如果你要保存成文件，可以在命令外层重定向：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/generate_poetry.py \
+  --model-dir artifacts/poetry-gpt-tiny-body \
+  --prompt &quot;春风&quot; \
+  --num-return-sequences 5 \
+  &gt; artifacts/poetry-gpt-tiny-body/my_samples.txt</code></pre></div>
+<h3>怎样评估生成质量</h3>
+<h4>机械检查</h4>
+<p>先做最基础检查：</p>
+<ul>
+<li>是否非空。</li>
+<li>是否包含中文。</li>
+<li>是否大量重复。</li>
+<li>是否出现明显乱码。</li>
+<li>是否过早结束。</li>
+</ul>
+<h4>诗词风格检查</h4>
+<p>再看：</p>
+<ul>
+<li>是否有古典意象。</li>
+<li>句式是否像诗词。</li>
+<li>标点和换行是否自然。</li>
+<li>是否有韵律感。</li>
+</ul>
+<h4>语义检查</h4>
+<p>最后看：</p>
+<ul>
+<li>是否通顺。</li>
+<li>是否前后矛盾。</li>
+<li>是否只是堆砌词藻。</li>
+<li>是否能围绕 prompt 展开。</li>
+</ul>
+<p>tiny 模型在“风格”上会先变好，在“语义连贯”上提升较慢。这很正常。</p>
+<h3>它不能做什么</h3>
+<p>这个模型不是聊天模型，也不是知识问答模型。它只做一件事：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>根据前文继续生成诗词风格文本。</code></pre></div>
+<p>不建议用它来：</p>
+<ul>
+<li>回答历史事实。</li>
+<li>判断诗句真伪。</li>
+<li>做可靠注释。</li>
+<li>生成现代对话。</li>
+</ul>
+<p>如果要做这些，需要不同的数据和训练目标。</p>
+<h3>如何让生成更好</h3>
+<p>优先级建议：</p>
+<ol>
+<li>训练更久。</li>
+<li>使用稍大模型，例如 <code>small</code>。</li>
+<li>提高数据质量，去掉不想学的来源。</li>
+<li>使用带元信息训练，让模型学会题目/作者/体裁条件。</li>
+<li>做更系统的样本评估。</li>
+</ol>
+<p>不要只靠调 <code>temperature</code> 期待质变。采样参数能改变风格和随机性，但不能替代模型能力。</p>
+<h3>本章检查点</h3>
+<p>你应该能回答：</p>
+<ul>
+<li><span class="qa-item" tabindex="0">生成阶段和训练阶段有什么区别？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">训练阶段会计算 loss、反向传播并更新权重；生成阶段只加载已训练模型，根据 prompt 逐 token 采样，不再修改模型参数。</span></span></li>
+<li><span class="qa-item" tabindex="0"><code>temperature</code>、<code>top-p</code>、<code>top-k</code> 分别影响什么？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note"><code>temperature</code> 控制分布尖锐或随机；<code>top-p</code> 保留累计概率达到阈值的一组候选；<code>top-k</code> 只允许概率最高的 k 个候选参与采样。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么 tiny 模型有诗词味但语义可能松散？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">tiny 模型参数少、训练步数短，容易先学到标点、句式、常见词和韵味，但长程结构、意象连贯和语义控制还不稳定。</span></span></li>
+<li><span class="qa-item" tabindex="0">如何保存并评估一批生成样本？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">固定模型目录、prompt 和采样参数，批量生成到 txt 或 jsonl；再记录命令、样本、是否含中文、重复率、可读性、格律或主题符合度。</span></span></li>
+</ul>
+<p>下一章讨论如何把这个 tiny 版实验扩展成更认真、更长周期的预训练项目。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-07-next-steps-and-scale" data-title="扩展路线 07 下一步：扩大训练与系统实验">
+  <div class="chapter-head">
+    <span>07_next_steps_and_scale.md</span>
+    <h2>07 下一步：扩大训练与系统实验</h2>
+    <p>从 tiny baseline 走向更长训练、更大模型和系统实验。</p>
+  </div>
+  <div class="chapter-body">
+    <p>现在你已经有了一个完整可运行模型。下一步不是盲目把参数都调大，而是有计划地做实验。</p>
+<h3>当前模型定位</h3>
+<p>当前模型：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/</code></pre></div>
+<p>适合：</p>
+<ul>
+<li>学习预训练全流程。</li>
+<li>验证数据、tokenizer、训练、保存、生成链路。</li>
+<li>做小规模诗词风格生成实验。</li>
+<li>作为后续实验 baseline。</li>
+</ul>
+<p>不适合：</p>
+<ul>
+<li>直接产出高质量成品诗词。</li>
+<li>可靠回答历史知识。</li>
+<li>作为通用中文模型。</li>
+</ul>
+<h3>提升路线总览</h3>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>更干净的数据
+  -&gt; 更合适的 tokenizer
+  -&gt; 更长训练
+  -&gt; 更大模型
+  -&gt; 更系统评估
+  -&gt; 条件生成或微调</code></pre></div>
+<p>每次只改一两个变量，记录结果。否则你不知道效果来自哪里。</p>
+<h3>路线 A：延长训练</h3>
+<p>最简单的提升方式是从 checkpoint 继续训练。</p>
+<p>例如从 5000 step 到 20000 step：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-tiny-body-20k \
+  --model-size tiny \
+  --block-size 256 \
+  --max-steps 20000 \
+  --per-device-train-batch-size 8 \
+  --per-device-eval-batch-size 8 \
+  --gradient-accumulation-steps 4 \
+  --learning-rate 3e-4 \
+  --warmup-ratio 0.03 \
+  --weight-decay 0.1 \
+  --logging-steps 100 \
+  --eval-steps 1000 \
+  --save-steps 5000 \
+  --save-total-limit 3</code></pre></div>
+<p>如果想从现有 5000 step 继续：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-tiny-body \
+  --model-size tiny \
+  --block-size 256 \
+  --max-steps 20000 \
+  --resume-from-checkpoint artifacts/poetry-gpt-tiny-body/checkpoint-5000</code></pre></div>
+<p>恢复训练时建议先确认脚本参数和旧训练一致。</p>
+<h3>路线 B：增大模型</h3>
+<p>脚本内置预设：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>preset</th>
+<th>层数</th>
+<th>头数</th>
+<th>embedding</th>
+</tr></thead><tbody>
+<tr>
+<td><code>nano</code></td>
+<td>2</td>
+<td>4</td>
+<td>128</td>
+</tr>
+<tr>
+<td><code>tiny</code></td>
+<td>4</td>
+<td>4</td>
+<td>256</td>
+</tr>
+<tr>
+<td><code>small</code></td>
+<td>6</td>
+<td>6</td>
+<td>384</td>
+</tr>
+<tr>
+<td><code>base</code></td>
+<td>8</td>
+<td>8</td>
+<td>512</td>
+</tr>
+</tbody></table></div>
+<p>尝试 <code>small</code>：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-small-body \
+  --model-size small \
+  --block-size 256 \
+  --max-steps 10000 \
+  --per-device-train-batch-size 4 \
+  --gradient-accumulation-steps 8 \
+  --learning-rate 3e-4</code></pre></div>
+<p>模型变大后，单步更慢，也更容易受显存限制。可以降低 <code>per-device-train-batch-size</code>，再用 <code>gradient-accumulation-steps</code> 补有效 batch。</p>
+<h3>路线 C：增大上下文</h3>
+<p><code>block-size</code> 决定模型能看多长上下文。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>128：快，适合 smoke test。
+256：当前 tiny 正式训练使用。
+512：更长上下文，但更吃内存。</code></pre></div>
+<p>如果你要训练更长的词或带元信息文本，可以尝试：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>--block-size 512</code></pre></div>
+<p>但注意：换 block size 会改变模型结构里的 position embedding 长度。恢复旧 checkpoint 时最好保持一致。</p>
+<h3>路线 D：带元信息训练</h3>
+<p>正文模型只能从 prompt 续写。带元信息训练可以让模型学：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>题目：秋夜
+作者：李白
+朝代：唐
+正文...</code></pre></div>
+<p>命令：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/train_tiny_gpt.py \
+  --input-jsonl data/processed/poems_shi_ci_dedup.jsonl \
+  --tokenizer-dir artifacts/poetry-bpe-tokenizer \
+  --output-dir artifacts/poetry-gpt-tiny-meta \
+  --model-size tiny \
+  --block-size 256 \
+  --max-steps 10000 \
+  --per-device-train-batch-size 8 \
+  --gradient-accumulation-steps 4 \
+  --learning-rate 5e-4 \
+  --with-meta</code></pre></div>
+<p>生成时 prompt 可以写成：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>题目：春夜
+朝代：唐</code></pre></div>
+<p>模型会尝试按这种格式续写。</p>
+<h3>路线 E：改进数据</h3>
+<p>数据决定模型风格。你可以做几类数据实验：</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>实验</th>
+<th>目的</th>
+</tr></thead><tbody>
+<tr>
+<td>只用唐诗</td>
+<td>风格更集中。</td>
+</tr>
+<tr>
+<td>唐诗 + 宋词</td>
+<td>当前主路线，风格更丰富。</td>
+</tr>
+<tr>
+<td>去掉重复/短文本</td>
+<td>减少噪声。</td>
+</tr>
+<tr>
+<td>加元信息</td>
+<td>支持条件生成。</td>
+</tr>
+<tr>
+<td>繁简统一</td>
+<td>减少同义字符分裂，但可能损失原貌。</td>
+</tr>
+</tbody></table></div>
+<p>每次改数据后，建议重新训练 tokenizer。因为 tokenizer 应该贴合数据分布。</p>
+<h3>实验记录模板</h3>
+<p>每次正式训练建议记录：</p>
+<div class="code-block" data-lang="markdown"><div class="code-head"><span>markdown</span><button type="button" class="copy-btn">复制</button></div><pre><code>## 实验名
+
+- 日期：
+- 数据：
+- tokenizer：
+- 模型规模：
+- block size：
+- max steps：
+- batch / grad accumulation：
+- learning rate：
+- 训练 loss：
+- eval loss：
+- 模型路径：
+- 样本路径：
+- 主观观察：
+- 下一步：</code></pre></div>
+<p>本项目已经生成了一份报告：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/training_run_report.md</code></pre></div>
+<p>你后面可以照这个格式扩展。</p>
+<h3>最小对比实验建议</h3>
+<p>建议从这三个实验开始：</p>
+<h4>实验 1：tiny 训练更久</h4>
+<p>目标：判断 longer training 是否明显提升样本。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>tiny / block 256 / 20000 steps</code></pre></div>
+<h4>实验 2：small 短训练</h4>
+<p>目标：判断更大模型是否更快学到结构。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>small / block 256 / 5000 steps</code></pre></div>
+<h4>实验 3：with-meta</h4>
+<p>目标：判断元信息条件生成是否有用。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>tiny / block 256 / with-meta / 10000 steps</code></pre></div>
+<p>每个实验都用同一组 prompt 生成样本：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春风
+明月
+江南
+秋夜
+山中
+故人</code></pre></div>
+<p>这样方便横向比较。</p>
+<h3>什么时候需要更强硬件</h3>
+<p>Mac/MPS 足够：</p>
+<ul>
+<li>smoke test。</li>
+<li>tokenizer 训练。</li>
+<li>tiny 模型短训练。</li>
+<li>小规模手写 PyTorch 实验。</li>
+</ul>
+<p>更大模型或更久训练建议考虑 CUDA GPU：</p>
+<ul>
+<li><code>small</code> 以上模型。</li>
+<li><code>block-size=512</code> 或更大。</li>
+<li>几万到几十万 step。</li>
+<li>更系统的超参搜索。</li>
+</ul>
+<h3>本章检查点</h3>
+<p>你应该能回答：</p>
+<ul>
+<li><span class="qa-item" tabindex="0">提升模型质量时，数据、训练步数、模型规模哪个先改？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">通常先保证数据和验证链路干净，再增加训练步数；确认模型欠拟合或容量不够后，再扩大模型规模。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么一次实验不要改太多变量？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">同时改数据、模型、学习率和采样参数后，很难判断质量变化来自哪里。一次只改少数关键变量，实验才可比较、可复现。</span></span></li>
+<li><span class="qa-item" tabindex="0">带元信息训练解决什么问题？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">把题目、作者、朝代、体裁等信息放进训练文本，可以让模型学习“条件 -&gt; 正文”的关系，未来更容易按题目或风格生成。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么换 tokenizer 后旧模型不能直接复用？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">token id 的含义变了，embedding 和 LM head 学到的是旧词表对应关系。换 tokenizer 等于换输入输出字典，旧权重不能直接匹配。</span></span></li>
+</ul>
+<p>你已经完成了从 0 到 1。下一步是从“能跑”走向“跑得更好、可比较、可复现”。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-08-glossary" data-title="术语表 08 术语表">
+  <div class="chapter-head">
+    <span>08_glossary.md</span>
+    <h2>08 术语表</h2>
+    <p>集中速查预训练、生成和评估中的核心概念。</p>
+  </div>
+  <div class="chapter-body">
+    <p>这份术语表把教程里反复出现的概念放在一起。第一次读不懂没关系，跑过一遍流程后再回来查，会更容易连起来。</p>
+<h3>artifact</h3>
+<p>训练或验证产生的文件。比如 tokenizer、checkpoint、模型权重、生成样本、报告。</p>
+<p>本项目里主要在：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/</code></pre></div>
+<h3>batch</h3>
+<p>一次送进模型的样本数量。</p>
+<p><code>per-device-train-batch-size=8</code> 表示每次前向计算处理 8 个样本。</p>
+<h3>BPE</h3>
+<p>Byte Pair Encoding。它从小单位开始，不断合并高频相邻片段，形成词表。</p>
+<p>诗词里高频的 <code>春风</code>、<code>明月</code> 之类片段可能会被合并成更短 token 序列。</p>
+<h3>block size</h3>
+<p>每个训练样本包含的 token 长度。</p>
+<p><code>block-size=256</code> 表示模型每次最多在 256 个 token 的上下文中学习预测。</p>
+<h3>causal language model</h3>
+<p>因果语言模型。只能看当前位置之前的内容，不能看未来 token。GPT 就是这种模型。</p>
+<p>它适合生成任务，因为生成时本来就只能根据已经生成的内容继续写。</p>
+<h3>causal mask</h3>
+<p>一个遮罩，用来阻止模型看到未来 token。</p>
+<p>没有 causal mask，模型训练时会偷看答案，生成时就学不到正确能力。</p>
+<h3>checkpoint</h3>
+<p>训练中途保存的模型状态。</p>
+<p>本项目正式训练保留了：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>checkpoint-3000/
+checkpoint-4000/
+checkpoint-5000/</code></pre></div>
+<p>checkpoint 可用于恢复训练或比较不同阶段模型。</p>
+<h3>cross entropy</h3>
+<p>分类任务常用损失函数。语言模型每个位置都在做“下一个 token 是词表中哪一个”的分类。</p>
+<p>正确 token 概率越高，cross entropy 越低。</p>
+<h3>embedding</h3>
+<p>把离散 token id 映射成连续向量。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>token id -&gt; embedding vector</code></pre></div>
+<p>模型真正计算的是向量，不是文字。</p>
+<h3>eval loss</h3>
+<p>验证集 loss。它用模型没直接训练过的数据计算，更适合判断模型是否泛化。</p>
+<p>训练时同时看 <code>loss</code> 和 <code>eval_loss</code>。</p>
+<h3>forward</h3>
+<p>模型前向计算。从输入 token id 得到 logits 和 loss。</p>
+<p>训练时：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>forward -&gt; loss -&gt; backward -&gt; optimizer step</code></pre></div>
+<p>生成时通常只做 forward，不做 backward。</p>
+<h3>gradient</h3>
+<p>梯度。它告诉优化器每个参数应该往哪个方向调整，才能让 loss 下降。</p>
+<h3>gradient accumulation</h3>
+<p>梯度累积。显存不够时，可以多次小 batch 前向/反向，把梯度累积起来，再更新一次参数。</p>
+<p>有效 batch size 约等于：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>batch size * gradient accumulation steps</code></pre></div>
+<h3>learning rate</h3>
+<p>学习率。控制每次参数更新的步子多大。</p>
+<p>太大可能不稳定，太小训练很慢。</p>
+<h3>learning rate schedule</h3>
+<p>学习率调度。本项目使用 warmup + cosine decay：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>先升高 -&gt; 再逐步降低</code></pre></div>
+<h3>logits</h3>
+<p>模型输出的原始分数，还不是概率。</p>
+<p>每个位置都会输出一个长度为 vocab size 的 logits 向量。</p>
+<h3>MLP</h3>
+<p>多层感知机。Transformer block 里的非线性变换部分，通常是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>Linear -&gt; GELU -&gt; Linear</code></pre></div>
+<h3>model.safetensors</h3>
+<p>模型权重文件。相比传统 pickle 格式更安全。</p>
+<p>本项目最终权重：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/poetry-gpt-tiny-body/model.safetensors</code></pre></div>
+<h3>MPS</h3>
+<p>Apple Silicon 上的 GPU 加速后端。Mac 上 torch 检查到 <code>mps</code> 时可以使用它加速训练。</p>
+<h3>perplexity</h3>
+<p>困惑度，常由 loss 转换而来：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>perplexity = exp(loss)</code></pre></div>
+<p>loss 越低，perplexity 越低。它是语言模型常见指标，但生成质量还需要看样本。</p>
+<h3>position embedding</h3>
+<p>位置向量。因为 Transformer 不天然知道顺序，所以要给每个位置加一个向量。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>token embedding + position embedding</code></pre></div>
+<h3>prompt</h3>
+<p>生成时给模型的开头文本。</p>
+<p>例如：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>春风
+明月
+题目：秋夜</code></pre></div>
+<p>模型会基于 prompt 继续生成。</p>
+<h3>self-attention</h3>
+<p>让每个 token 根据上下文其他 token 更新自己的表示。</p>
+<p>GPT 使用 masked self-attention，也就是不能看未来。</p>
+<h3>smoke test</h3>
+<p>烟雾测试。用很小数据、很少 step 快速确认流程能跑。</p>
+<p>它不追求模型质量，只验证链路是否断。</p>
+<h3>temperature</h3>
+<p>生成采样参数。控制随机性。</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>低：保守
+高：发散</code></pre></div>
+<p>常用范围是 0.7 到 1.0。</p>
+<h3>token</h3>
+<p>模型处理文本的单位。可能是字、词、片段、标点或字节片段。</p>
+<h3>tokenizer</h3>
+<p>把文本和 token id 相互转换的组件。</p>
+<p>同一个模型必须配同一个 tokenizer。</p>
+<h3>top-k</h3>
+<p>生成时只从概率最高的 k 个 token 中采样。</p>
+<h3>top-p</h3>
+<p>生成时保留累计概率达到 p 的候选 token 集合，再从中采样。</p>
+<p>也叫 nucleus sampling。</p>
+<h3>train loss</h3>
+<p>训练集 loss。它反映模型对训练数据的拟合程度。</p>
+<p>它应该整体下降，但局部波动正常。</p>
+<h3>vocab size</h3>
+<p>tokenizer 词表大小。这个项目当前主 tokenizer 是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>vocab size = 12000</code></pre></div>
+<h3>weight decay</h3>
+<p>权重衰减，一种正则化手段。它会轻微惩罚参数过大，帮助训练更稳定。</p>
+  </div>
+</article>
+
+
+<article class="chapter" id="chapter-09-public-deployment" data-title="公网部署 09 部署到公网访问">
+  <div class="chapter-head">
+    <span>09_public_deployment.md</span>
+    <h2>09 部署到公网访问</h2>
+    <p>把静态学习站点发布到公网，方便其它设备访问。</p>
+  </div>
+  <div class="chapter-body">
+    <p>当前学习站点是纯静态站点，不需要后端服务。只要把少量静态文件发布到静态托管平台，其它设备就可以通过公网 URL 访问。</p>
+<p>核心文件是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>index.html
+styles.css
+site.js
+assets/</code></pre></div>
+<p>不要直接上传项目根目录。项目根目录里有 <code>data/</code>、<code>artifacts/</code>、模型权重、训练样本和本机环境文件。公开部署只应该上传站点文件。</p>
+<h3>先准备发布目录</h3>
+<p>每次修改教程或重新生成 HTML 后，先运行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python scripts/prepare_learning_site_deploy.py</code></pre></div>
+<p>它会生成：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/deploy/learning-site/</code></pre></div>
+<p>这个目录只包含公网访问需要的静态文件：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/deploy/learning-site/
+├── index.html
+├── styles.css
+├── site.js
+├── assets/
+├── .nojekyll
+└── _headers</code></pre></div>
+<p>后面所有部署命令都使用这个目录。</p>
+<h3>推荐方案</h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>场景</th>
+<th>推荐方式</th>
+<th>特点</th>
+</tr></thead><tbody>
+<tr>
+<td>只想今天在手机或另一台电脑看</td>
+<td>Cloudflare Tunnel</td>
+<td>最快，不需要真正部署；电脑关机后 URL 失效。</td>
+</tr>
+<tr>
+<td>想长期访问，不想建 Git 仓库</td>
+<td>Cloudflare Pages Direct Upload</td>
+<td>上传一个静态目录，自动有 HTTPS URL。</td>
+</tr>
+<tr>
+<td>想长期访问，操作简单</td>
+<td>Netlify Deploy</td>
+<td>CLI 或网页拖拽都可以。</td>
+</tr>
+<tr>
+<td>已经在用 Vercel</td>
+<td>Vercel</td>
+<td>适合静态站点，也适合以后加前端工程化。</td>
+</tr>
+<tr>
+<td>想和 GitHub 仓库绑定</td>
+<td>GitHub Pages</td>
+<td>适合长期版本管理，但初始配置稍多。</td>
+</tr>
+</tbody></table></div>
+<p>我的建议是：</p>
+<ul>
+<li>临时访问：用 Cloudflare Tunnel。</li>
+<li>长期访问：优先用 Cloudflare Pages 或 Netlify。</li>
+<li>如果以后要做成完整前端项目，再考虑 Vercel 或 GitHub Pages。</li>
+</ul>
+<h3>方案 A：临时公网访问</h3>
+<p>这个方式适合你现在马上用手机打开学习站点。</p>
+<p>先启动本地静态服务：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>cd artifacts/deploy/learning-site
+python3 -m http.server 8080</code></pre></div>
+<p>再开一个终端，把本地端口映射到公网：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>cloudflared tunnel --url http://localhost:8080</code></pre></div>
+<p>终端会输出一个类似这样的 URL：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>https://example.trycloudflare.com</code></pre></div>
+<p>用手机或其它电脑打开这个 URL 即可。</p>
+<p>注意：</p>
+<ul>
+<li>这个 URL 是临时的。</li>
+<li>本机不能关机。</li>
+<li>终端进程不能退出。</li>
+<li>适合自用预览，不适合长期分享。</li>
+</ul>
+<h3>方案 B：Cloudflare Pages 长期部署</h3>
+<p>适合不想维护服务器，但希望有稳定 HTTPS 链接。</p>
+<p>先登录：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>npx wrangler login</code></pre></div>
+<p>创建 Pages 项目：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>npx wrangler pages project create poetry-gpt-lab</code></pre></div>
+<p>部署静态目录：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>npx wrangler pages deploy artifacts/deploy/learning-site --project-name poetry-gpt-lab</code></pre></div>
+<p>部署完成后，Cloudflare 会给出一个公网 URL。之后每次更新站点，只需要重新运行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>python learning/site/build_site.py
+python scripts/prepare_learning_site_deploy.py
+npx wrangler pages deploy artifacts/deploy/learning-site --project-name poetry-gpt-lab</code></pre></div>
+<h3>方案 C：Netlify 长期部署</h3>
+<p>如果你想用网页操作，Netlify 支持把静态目录拖到网页里发布。拖拽目录：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/deploy/learning-site/</code></pre></div>
+<p>如果使用 CLI：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>npx netlify-cli login
+npx netlify-cli deploy --dir=artifacts/deploy/learning-site
+npx netlify-cli deploy --dir=artifacts/deploy/learning-site --prod</code></pre></div>
+<p>第一次 <code>deploy</code> 通常用于预览，确认没有问题后再加 <code>--prod</code> 发布到正式 URL。</p>
+<h3>方案 D：Vercel 长期部署</h3>
+<p>Vercel 也可以直接部署静态目录：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>cd artifacts/deploy/learning-site
+npx vercel
+npx vercel --prod</code></pre></div>
+<p>第一次执行时，按提示创建项目。这个站点没有构建命令，输出目录就是当前目录。</p>
+<p>如果你从项目根目录执行 Vercel，容易误上传整个项目。因此推荐先 <code>cd artifacts/deploy/learning-site</code> 再运行 <code>vercel</code>。</p>
+<h3>方案 E：GitHub Pages</h3>
+<p>GitHub Pages 适合把教程和站点都放到 GitHub 仓库里长期维护。</p>
+<p>当前项目目录不是 Git 仓库，所以 GitHub Pages 不是最快路径。要用 GitHub Pages，你需要：</p>
+<ol>
+<li>创建 GitHub 仓库。</li>
+<li>把项目提交到仓库。</li>
+<li>配置 GitHub Actions，把 <code>artifacts/deploy/learning-site/</code> 发布到 Pages。</li>
+</ol>
+<p>如果只是想在其它设备访问，不建议第一步就选 GitHub Pages。</p>
+<h3>部署前检查</h3>
+<p>运行：</p>
+<div class="code-block" data-lang="bash"><div class="code-head"><span>bash</span><button type="button" class="copy-btn">复制</button></div><pre><code>rg -n &quot;/Users/|api[_-]?key|secret|password|Bearer|密钥|密码&quot; learning artifacts/deploy/learning-site</code></pre></div>
+<p>当前教程里有本机路径示例，例如：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>$HOME/...</code></pre></div>
+<p>如果 URL 只给自己使用，可以接受。如果要公开分享给别人，建议把这些路径改成更通用的写法：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>cd your-project-directory</code></pre></div>
+<h3>部署后的验证</h3>
+<p>拿到公网 URL 后，至少检查：</p>
+<ul>
+<li>首页能打开。</li>
+<li>左侧章节导航能跳转。</li>
+<li>图片能正常加载。</li>
+<li>代码块复制按钮可用。</li>
+<li>“本章检查点”的答案 hover 能显示。</li>
+<li>手机浏览器排版没有明显遮挡。</li>
+</ul>
+<p>如果 CSS 或图片加载失败，通常是上传目录不完整。确认你上传的是：</p>
+<div class="code-block" data-lang="text"><div class="code-head"><span>text</span><button type="button" class="copy-btn">复制</button></div><pre><code>artifacts/deploy/learning-site/</code></pre></div>
+<p>而不是只上传了 <code>index.html</code>。</p>
+<h3>重要边界</h3>
+<p>这个部署只发布学习站点，不发布训练好的模型服务。</p>
+<p>也就是说：</p>
+<ul>
+<li>可以公网浏览教程。</li>
+<li>可以公网查看生成样例。</li>
+<li>不能在网页里实时调用模型生成诗词。</li>
+</ul>
+<p>如果以后想让网页在线生成诗词，需要额外做一个推理服务。常见选择是 Hugging Face Spaces、云服务器、Modal、Replicate 或自建 API。那是后端和推理部署问题，不属于静态站点部署。</p>
+<h3>本章检查点</h3>
+<p>你应该能回答：</p>
+<ul>
+<li><span class="qa-item" tabindex="0">为什么不能直接部署项目根目录？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">项目根目录包含 <code>data/</code>、<code>artifacts/</code>、模型权重、训练样本和本机环境文件。公网部署只需要静态站点文件，直接上传根目录会扩大暴露面。</span></span></li>
+<li><span class="qa-item" tabindex="0">临时公网访问和长期静态托管有什么区别？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">临时访问依赖本机服务和隧道进程，适合短时间自用；长期托管会把静态文件发布到平台 CDN，URL 稳定，电脑关机后也能访问。</span></span></li>
+<li><span class="qa-item" tabindex="0"><code>artifacts/deploy/learning-site/</code> 里应该包含哪些文件？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">至少应包含 <code>index.html</code>、<code>styles.css</code>、<code>site.js</code> 和 <code>assets/</code>。本项目还会放入 <code>.nojekyll</code> 和 <code>_headers</code>，用于兼容部分静态托管平台和基础安全响应头。</span></span></li>
+<li><span class="qa-item" tabindex="0">为什么静态站点部署后不能直接在线运行模型生成？<span class="qa-badge" aria-hidden="true">答案</span><span class="qa-answer" role="note">静态托管只负责分发 HTML、CSS、JS 和图片，不提供 Python、PyTorch 或 GPU 推理进程。在线生成需要额外部署后端推理服务。</span></span></li>
+</ul>
+  </div>
+</article>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>静态站点由本地 Markdown 教程生成。生成图片已复制到 <code>learning/site/assets/</code>。</p>
+  </footer>
+  <script src="site.js"></script>
+</body>
+</html>
