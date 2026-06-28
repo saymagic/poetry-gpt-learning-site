@@ -5,9 +5,8 @@ poetry GPT pretraining walkthrough.
 
 ## What is included
 
-- `site/`: static HTML/CSS/JS site deployed by GitHub Pages.
+- Root static files: the GitHub Pages site.
 - `tutorials/`: Markdown source tutorials.
-- `.github/workflows/pages.yml`: GitHub Pages deployment workflow.
 
 ## What is intentionally excluded
 
@@ -18,3 +17,11 @@ poetry GPT pretraining walkthrough.
 
 The published site is a static tutorial. It does not run model inference in the
 browser.
+
+## GitHub Pages setting
+
+Use branch-based Pages publishing:
+
+- Source: Deploy from a branch
+- Branch: `main`
+- Folder: `/root`
